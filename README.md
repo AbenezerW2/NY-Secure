@@ -1,6 +1,10 @@
 # Atlas Access Control
 
-Atlas is a fictional physical-access-control simulator for a colocation data center. It models the facility, tenants, people, credentials, reusable access profiles, time-bounded assignments, and an immutable badge-decision trail.
+Atlas is an enterprise-level physical-security system designed to help users understand their security environment through clear, explainable access control. The current release is a fictional colocation data-center simulator that models the facility, tenants, people, credentials, reusable access profiles, time-bounded assignments, and an immutable badge-decision trail.
+
+**Live private demo:** [Atlas Access Control](https://atlas-dc-access-lab.abine26.chatgpt.site)
+
+For the living record of implemented behavior and decision logic, see [CAPABILITIES.md](./CAPABILITIES.md).
 
 The prototype intentionally does not communicate with real readers, controllers, doors, or identity systems. Every organization, person, badge number, and event is fictional.
 
