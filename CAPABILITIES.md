@@ -1,6 +1,6 @@
-# Atlas Capability Ledger
+# NY-Secure Capability Ledger
 
-This file is the living system contract for Atlas. Update it whenever a capability is added, changed, or removed so someone reading the repository can understand what the security system actually knows how to do.
+This file is the living system contract for NY-Secure. Update it whenever a capability is added, changed, or removed so someone reading the repository can understand what the security system actually knows how to do.
 
 Legend:
 
@@ -8,28 +8,26 @@ Legend:
 - `PARTIAL` — the data or interface exists, but enforcement is not complete
 - `PLANNED` — intentionally reserved for a future release
 
-## Release 0.1 — Colocation access-control foundation
+## Release 0.2 — NY-Secure facility expansion
 
 ### Facility model — `IMPLEMENTED`
 
-Atlas models a 22-zone colocation environment containing:
+NY-Secure models an 81-zone canonical colocation environment containing two controlled mantraps and 62 customer cages:
 
 ```text
-SITE Atlas DC-01
+SITE NY-Secure DC-01
 ├── PERIMETER
 │   └── Main Gate
 ├── COMMON / SECURITY
 │   ├── Main Entrance
+│   ├── Main Entrance Mantrap
 │   ├── Security Lobby
-│   ├── Data Hall Mantrap
 │   └── Secure Spine
 ├── COLOCATION
 │   ├── Colocation Hall A
-│   │   ├── Customer Cage 111 → Northstar Analytics
-│   │   └── Customer Cage 112 → Lumina Commerce
+│   │   └── Cages 11000–11300 in increments of 10 (31 cages)
 │   └── Colocation Hall B
-│       ├── Customer Cage 113 → Redwood Biotech
-│       └── Customer Cage 114 → Available
+│       └── Cages 22000–22300 in increments of 10 (31 cages)
 ├── CRITICAL INFRASTRUCTURE
 │   ├── UPS Room A
 │   ├── UPS Room B
@@ -40,6 +38,7 @@ SITE Atlas DC-01
 │   └── Roof Access
 └── LOGISTICS / SERVICE
     ├── Loading Dock
+    ├── Loading Dock Mantrap
     ├── Receiving & Staging
     ├── Break Room
     └── Janitorial Supply Room
@@ -49,24 +48,28 @@ Each zone has a unique ID, category, location, security tier, operational status
 
 ### Organizations and colocation tenants — `IMPLEMENTED`
 
-Atlas separates organizations from people. Current organization types include:
+NY-Secure separates organizations from people. Current organization types include:
 
 ```text
 DATA_CENTER_OPERATOR
 COLOCATION_CUSTOMER
-CONTRACTOR
-VENDOR
-SERVICE_PROVIDER
+NETWORK_PROVIDER
 ```
 
-Implemented tenant examples:
+Implemented fictional organization roster:
 
 ```text
-Northstar Analytics  OWNS Cage 111
-Lumina Commerce      OWNS Cage 112
-Redwood Biotech      OWNS Cage 113
-Cage 114             IS available
+NY-Secure              DATA_CENTER_OPERATOR
+Citadel Securities     COLOCATION_CUSTOMER
+Two Sigma               COLOCATION_CUSTOMER
+Hudson River Trading    COLOCATION_CUSTOMER
+Jane Street             COLOCATION_CUSTOMER
+Lumen Technologies      NETWORK_PROVIDER
+Zayo                    NETWORK_PROVIDER
+Boldyn Networks         NETWORK_PROVIDER
 ```
+
+The interface rotates the fictional HFT and network organizations across cage ownership labels for demonstration. The simulator does not claim real-world occupancy or customer relationships.
 
 ### People and operational roles — `IMPLEMENTED`
 
@@ -117,7 +120,7 @@ The interface displays badge number and active/suspended state. All badge identi
 Reusable profiles currently include:
 
 ```text
-Customer · Cage 111
+Customer · Cage 11000
 Contractor · Facilities Maintenance
 Engineer · Critical Infrastructure
 Vendor · Delivery Route
@@ -130,14 +133,15 @@ Each profile connects to one or more allowed facility zones. Profiles are assign
 Examples:
 
 ```text
-PROFILE Customer · Cage 111
-ALLOW Main Gate, Main Entrance, Security Lobby, Mantrap
-ALLOW Secure Spine, Colocation Hall A, Cage 111, Break Room
-DENY  Cage 112, Cage 113, Cage 114, UPS, Generators, NOC
+PROFILE Customer · Cage 11000
+ALLOW Main Gate, Main Entrance, Main Entrance Mantrap, Security Lobby
+ALLOW Secure Spine, Colocation Hall A, Cage 11000, Break Room
+DENY  Other customer cages, UPS, Generators, NOC
 
 PROFILE Vendor · Delivery Route
-ALLOW Main Gate, Main Entrance, Security Lobby, Loading Dock, Receiving
-DENY  Mantrap, Customer Cages, UPS, Generators, NOC
+ALLOW Main Gate, Main Entrance, Main Entrance Mantrap, Security Lobby
+ALLOW Loading Dock, Loading Dock Mantrap, Receiving
+DENY  Customer Cages, UPS, Generators, NOC
 ```
 
 ### Access assignment and revocation — `IMPLEMENTED`
@@ -206,13 +210,46 @@ plain_language_explanation
 timestamp
 ```
 
-Access revocation is a soft revocation. Atlas preserves assignments and events instead of deleting security history.
+Access revocation is a soft revocation. NY-Secure preserves assignments and events instead of deleting security history.
+
+### Secure mantrap routing — `IMPLEMENTED`
+
+The facility model makes both secure transitions explicit:
+
+```text
+PEOPLE ROUTE
+Main Entrance → Main Entrance Mantrap → Security Lobby → permitted destination
+
+LOGISTICS ROUTE
+Loading Dock → Loading Dock Mantrap → Receiving & Staging → permitted destination
+```
+
+The customer, contractor, vendor, visitor, and janitorial profiles include the Main Entrance Mantrap where their route requires it. Contractor, vendor, and full-facility engineer access include the Loading Dock Mantrap. A mantrap decision is evaluated and recorded using the same default-deny rules as every other controlled zone.
+
+### Overview drill-down logs — `IMPLEMENTED`
+
+The four overview summary cards are buttons that open focused, photo-backed log drawers:
+
+```text
+People on site      → active occupants, organization, last verified area
+Active credentials → badge holder, organization, badge ID, credential state
+Access granted     → granted events, zone, explanation, timestamp
+Access denied      → denied events, zone, reason context, timestamp
+```
+
+These views derive their identities and event details from the current simulator state. The portraits are visual demo assets and are not biometric records.
+
+### Visual theme — `IMPLEMENTED`
+
+NY-Secure uses a white-and-cobalt-blue light theme and a navy dark theme. The theme switcher stores only the display preference in browser storage. It does not move identities, assignments, zones, or event history out of D1.
 
 ### Operations interface — `IMPLEMENTED`
 
 ```text
 Overview dashboard
+Clickable photo-backed summary logs
 Live facility map
+Light/dark theme switcher
 People and credential directory
 Organization and tenant directory
 Access policy catalog
@@ -232,7 +269,7 @@ The UI communicates schedule intent such as `24×7`, `delivery hours`, `visit wi
 
 ### Visitor escort enforcement — `PARTIAL`
 
-The escorted visitor profile and visitor identity type exist. Atlas does not yet require a checked-in authorized escort at decision time.
+The escorted visitor profile and visitor identity type exist. NY-Secure does not yet require a checked-in authorized escort at decision time.
 
 ## Planned capability queue
 
