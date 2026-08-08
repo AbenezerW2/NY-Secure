@@ -5,7 +5,7 @@ import test from "node:test";
 test("defines the NY-Secure access-control product experience", async () => {
   const [layout, consoleSource] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/atlas-console.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ny-secure-console.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(consoleSource, /Simulation environment/);
@@ -52,14 +52,14 @@ test("defines the NY-Secure access-control product experience", async () => {
 test("ships durable access-control capabilities instead of starter artifacts", async () => {
   const [page, consoleSource, layout, schema, hosting, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/atlas-console.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ny-secure-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /<AtlasConsole \/>/);
+  assert.match(page, /<NySecureConsole \/>/);
   assert.match(consoleSource, /\/api\/people/);
   assert.match(consoleSource, /\/api\/simulate/);
   assert.doesNotMatch(consoleSource, /Manage access/);

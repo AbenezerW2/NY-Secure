@@ -2,8 +2,6 @@
 
 NY-Secure is an enterprise physical-security simulator designed to make a colocation facility understandable through clear, explainable access control. It models tenants, people, credentials, mantraps, cage inventories, reusable access profiles, time-bounded assignments, and an immutable badge-decision trail.
 
-**Live private demo:** [NY-Secure Physical Security](https://atlas-dc-access-lab.abine26.chatgpt.site)
-
 For the living record of implemented behavior and decision logic, see [CAPABILITIES.md](./CAPABILITIES.md).
 
 **Latest update:** Fixed the People tab and added the new search features, internal results tabs, contact cards, and person profile tabs.
