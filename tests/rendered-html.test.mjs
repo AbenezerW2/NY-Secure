@@ -28,6 +28,10 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /people-search-button/);
   assert.match(consoleSource, /type="submit"/);
   assert.match(consoleSource, /PersonProfileCard/);
+  assert.match(consoleSource, /people-workspace-tabs/);
+  assert.match(consoleSource, /Directory search/);
+  assert.match(consoleSource, /closeProfile/);
+  assert.doesNotMatch(consoleSource, /profile-card-backdrop/);
   assert.match(consoleSource, /IBX access PIN/);
   assert.match(consoleSource, /Access history/);
   assert.match(consoleSource, /Point of contact/);

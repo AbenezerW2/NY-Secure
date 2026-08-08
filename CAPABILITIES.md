@@ -94,7 +94,9 @@ record_type
 
 Each search key has its own input. Populated parameters are combined with AND matching, while blank parameters are ignored. The page header is the only location for the Add person action, and the empty state does not reveal a directory record count.
 
-Search execution is explicit: field edits remain drafts until the operator selects Search or presses Enter. A result opens a profile card with a blank contact-photo placeholder and durable identity metadata:
+Search execution is explicit: field edits remain drafts until the operator selects Search or presses Enter. A result opens a named tab inside the People workspace. Directory search and multiple person profiles can remain open simultaneously; selecting a person tab replaces the visible search panel without opening a browser tab or overlay. Each person tab can be closed independently.
+
+The profile card uses a blank contact-photo placeholder and durable identity metadata:
 
 ```text
 IBX access PIN = six digits, sequential from 000001

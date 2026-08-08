@@ -893,6 +893,21 @@ select:focus-visible {
 
 .directory-panel { overflow: hidden; }
 .people-directory { min-height: clamp(460px, 58vh, 720px); }
+.people-workspace { min-width: 0; }
+.people-workspace-tabs { display: flex; align-items: end; gap: 4px; margin: 0 0 10px; overflow-x: auto; border-bottom: 1px solid #d8e1e6; }
+.people-workspace-tabs > button,
+.people-tab-shell { flex: 0 0 auto; }
+.people-workspace-tabs > button { min-height: 39px; padding: 0 14px; color: #61757c; background: #e9eef2; border: 1px solid #d8e1e6; border-bottom: 0; border-radius: 8px 8px 0 0; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
+.people-workspace-tabs > button.active { color: #245fae; background: #fff; }
+.people-tab-shell { display: flex; min-height: 39px; align-items: stretch; background: #e9eef2; border: 1px solid #d8e1e6; border-bottom: 0; border-radius: 8px 8px 0 0; overflow: hidden; }
+.people-tab-shell.active { background: #fff; }
+.person-tab { display: flex; align-items: center; gap: 7px; padding: 0 7px 0 11px; color: #61757c; background: transparent; border: 0; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
+.people-tab-shell.active .person-tab { color: #245fae; }
+.close-people-tab { width: 28px; color: #8a999f; background: transparent; border: 0; cursor: pointer; font-size: calc(13px * var(--font-scale)); }
+.close-people-tab:hover { color: #b84545; background: rgba(184, 69, 69, .08); }
+.mini-contact-photo { position: relative; display: inline-block; width: 18px; height: 18px; overflow: hidden; background: #cbd8e2; border-radius: 50%; }
+.mini-contact-photo::before { position: absolute; top: 4px; left: 6px; width: 6px; height: 6px; content: ""; background: #8299aa; border-radius: 50%; }
+.mini-contact-photo i { position: absolute; bottom: 2px; left: 4px; width: 10px; height: 6px; background: #8299aa; border-radius: 8px 8px 3px 3px; }
 .people-search-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 26px 18px; }
 .people-search-header h2 { margin: 3px 0 0; color: #263f45; font-size: calc(18px * var(--font-scale)); letter-spacing: -.025em; }
 .people-search-header > div > p:last-child { margin: 6px 0 0; color: #7c8d90; font-size: calc(9px * var(--font-scale)); }
@@ -919,9 +934,7 @@ select:focus-visible {
 .view-profile-button { min-height: 31px; padding: 0 10px; color: #2768c8; background: #edf4ff; border: 1px solid #cfe0f8; border-radius: 6px; cursor: pointer; font-size: calc(7px * var(--font-scale)); font-weight: 700; white-space: nowrap; }
 .people-no-results { margin: 55px auto; }
 
-.profile-card-backdrop { padding: 28px; }
-.person-profile-card { position: relative; display: grid; width: min(980px, 100%); max-height: min(760px, calc(100vh - 56px)); grid-template-columns: 290px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #d9e3e8; border-radius: 16px; box-shadow: 0 30px 80px rgba(19, 42, 63, .25); }
-.profile-close { position: absolute; top: 16px; right: 16px; z-index: 2; }
+.person-profile-card { position: relative; display: grid; width: 100%; min-height: clamp(500px, 62vh, 760px); grid-template-columns: 290px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #d9e3e8; border-radius: 12px; }
 .profile-identity { padding: 36px 27px; background: #f5f8fc; border-right: 1px solid #e0e7ec; }
 .blank-contact-photo { position: relative; display: block; width: 104px; height: 104px; margin-bottom: 20px; overflow: hidden; background: #dce7f1; border: 5px solid #fff; border-radius: 50%; box-shadow: 0 4px 18px rgba(32, 65, 91, .12); }
 .blank-contact-photo i { position: absolute; top: 22px; left: 50%; width: 31px; height: 31px; transform: translateX(-50%); background: #91a8bc; border-radius: 50%; }
@@ -1543,6 +1556,9 @@ select:focus-visible {
 .app-shell[data-theme="dark"] :is(.profile-tabs, .profile-identity dl > div, .profile-history-list article) { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.cage-access-list article, .profile-contact dl > div) { background: #132238; border-color: var(--line); }
 .app-shell[data-theme="dark"] .view-profile-button { color: #a9c8ff; background: #17345f; border-color: #315889; }
+.app-shell[data-theme="dark"] .people-workspace-tabs { border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.people-workspace-tabs > button, .people-tab-shell) { color: #8fa2b9; background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.people-workspace-tabs > button.active, .people-tab-shell.active) { color: #a9c8ff; background: var(--surface); }
 .app-shell[data-theme="dark"] .data-table tbody tr:focus-within { background: #1a2d48; }
 .app-shell[data-theme="dark"] .tree-branch button:hover,
 .app-shell[data-theme="dark"] .tree-branch button.active { color: #a9c8ff; background: #17345f; }
@@ -1632,8 +1648,7 @@ select:focus-visible {
   .identity-results td:nth-child(6)::before { content: "Work email"; }
   .identity-results td:nth-child(7)::before { content: "Record type"; }
   .identity-results td:nth-child(8)::before { content: "Profile"; }
-  .person-profile-card { max-height: calc(100vh - 24px); grid-template-columns: 1fr; overflow: auto; }
-  .profile-card-backdrop { padding: 12px; }
+  .person-profile-card { min-height: 0; grid-template-columns: 1fr; overflow: hidden; }
   .profile-identity { padding: 28px 21px 22px; border-right: 0; border-bottom: 1px solid var(--line); }
   .blank-contact-photo { width: 86px; height: 86px; }
   .profile-tabs { position: sticky; top: 0; z-index: 1; min-height: 58px; align-items: end; padding: 0 12px; background: inherit; }
