@@ -1,0 +1,820 @@
+import { env } from "cloudflare:workers";
+
+type OrganizationSeed = {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  contactEmail: string;
+};
+
+type ZoneSeed = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  location: string;
+  securityTier: number;
+  description: string;
+  sortOrder: number;
+};
+
+type PersonSeed = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  organizationId: string;
+  relationshipType: string;
+  jobFunction: string;
+  badgeNumber: string;
+};
+
+type ProfileSeed = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  relationshipType: string;
+  zoneIds: string[];
+};
+
+const organizations: OrganizationSeed[] = [
+  {
+    id: "org-atlas",
+    slug: "ny-secure",
+    name: "NY-Secure",
+    type: "DATA_CENTER_OPERATOR",
+    contactEmail: "security@ny-secure.example",
+  },
+  {
+    id: "org-northstar",
+    slug: "citadel-securities",
+    name: "Citadel Securities",
+    type: "COLOCATION_CUSTOMER",
+    contactEmail: "facilities@northstar.example",
+  },
+  {
+    id: "org-lumina",
+    slug: "two-sigma",
+    name: "Two Sigma",
+    type: "COLOCATION_CUSTOMER",
+    contactEmail: "infrastructure@lumina.example",
+  },
+  {
+    id: "org-redwood",
+    slug: "hudson-river-trading",
+    name: "Hudson River Trading",
+    type: "COLOCATION_CUSTOMER",
+    contactEmail: "datacenter@redwood-biotech.example",
+  },
+  {
+    id: "org-apex",
+    slug: "jane-street",
+    name: "Jane Street",
+    type: "COLOCATION_CUSTOMER",
+    contactEmail: "dispatch@apex-mechanical.example",
+  },
+  {
+    id: "org-meridian",
+    slug: "lumen-technologies",
+    name: "Lumen Technologies",
+    type: "NETWORK_PROVIDER",
+    contactEmail: "field-service@meridian-power.example",
+  },
+  {
+    id: "org-brightway",
+    slug: "zayo",
+    name: "Zayo",
+    type: "NETWORK_PROVIDER",
+    contactEmail: "operations@brightway.example",
+  },
+  {
+    id: "org-boldyn",
+    slug: "boldyn-networks",
+    name: "Boldyn Networks",
+    type: "NETWORK_PROVIDER",
+    contactEmail: "operations@boldyn.example",
+  },
+];
+
+const zones: ZoneSeed[] = [
+  {
+    id: "zone-main-gate",
+    code: "PER-GATE-01",
+    name: "Main Gate",
+    category: "PERIMETER",
+    location: "South perimeter",
+    securityTier: 1,
+    description: "Primary vehicle checkpoint and guard post.",
+    sortOrder: 10,
+  },
+  {
+    id: "zone-main-entrance",
+    code: "COM-ENT-01",
+    name: "Main Entrance",
+    category: "COMMON",
+    location: "Building 1 · Level 1",
+    securityTier: 1,
+    description: "Badge-controlled public entrance.",
+    sortOrder: 20,
+  },
+  {
+    id: "zone-entrance-mantrap",
+    code: "SEC-MAN-ENT",
+    name: "Main Entrance Mantrap",
+    category: "SECURITY",
+    location: "Building 1 · Level 1",
+    securityTier: 4,
+    description: "Interlocked two-door identity checkpoint immediately after the main entrance.",
+    sortOrder: 25,
+  },
+  {
+    id: "zone-security-lobby",
+    code: "COM-LOB-01",
+    name: "Security Lobby",
+    category: "COMMON",
+    location: "Building 1 · Level 1",
+    securityTier: 2,
+    description: "Reception, badging, and visitor processing area.",
+    sortOrder: 30,
+  },
+  {
+    id: "zone-secure-spine",
+    code: "SEC-SPINE-01",
+    name: "Secure Spine",
+    category: "SECURITY",
+    location: "Building 1 · Level 1",
+    securityTier: 3,
+    description: "Controlled circulation corridor connecting secure facility zones.",
+    sortOrder: 50,
+  },
+  {
+    id: "zone-colo-hall-a",
+    code: "COLO-HALL-A",
+    name: "Colocation Hall A",
+    category: "CUSTOMER_HALL",
+    location: "Building 1 · Level 1",
+    securityTier: 3,
+    description: "Tenant hall containing cages 11000 through 11300.",
+    sortOrder: 60,
+  },
+  {
+    id: "zone-colo-hall-b",
+    code: "COLO-HALL-B",
+    name: "Colocation Hall B",
+    category: "CUSTOMER_HALL",
+    location: "Building 1 · Level 1",
+    securityTier: 3,
+    description: "Tenant hall containing cages 22000 through 22300.",
+    sortOrder: 70,
+  },
+  ...Array.from({ length: 31 }, (_, index): ZoneSeed => {
+    const cage = 11000 + index * 10;
+    return { id: `zone-cage-${cage}`, code: `CAGE-${cage}`, name: `Cage ${cage}`, category: "CUSTOMER_CAGE", location: "Hall A", securityTier: 4, description: `Dedicated Hall A colocation cage ${cage}.`, sortOrder: 1000 + index };
+  }),
+  ...Array.from({ length: 31 }, (_, index): ZoneSeed => {
+    const cage = 22000 + index * 10;
+    return { id: `zone-cage-${cage}`, code: `CAGE-${cage}`, name: `Cage ${cage}`, category: "CUSTOMER_CAGE", location: "Hall B", securityTier: 4, description: `Dedicated Hall B colocation cage ${cage}.`, sortOrder: 2000 + index };
+  }),
+  {
+    id: "zone-ups-a",
+    code: "ELEC-UPS-A",
+    name: "UPS Room A",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "Central utility spine",
+    securityTier: 5,
+    description: "A-side uninterruptible power systems and batteries.",
+    sortOrder: 200,
+  },
+  {
+    id: "zone-ups-b",
+    code: "ELEC-UPS-B",
+    name: "UPS Room B",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "Central utility spine",
+    securityTier: 5,
+    description: "B-side uninterruptible power systems and batteries.",
+    sortOrder: 210,
+  },
+  {
+    id: "zone-generator-east",
+    code: "ELEC-GEN-E",
+    name: "East Generator Room",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "East utility yard",
+    securityTier: 5,
+    description: "East standby generators and transfer equipment.",
+    sortOrder: 220,
+  },
+  {
+    id: "zone-generator-west",
+    code: "ELEC-GEN-W",
+    name: "West Generator Room",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "West utility yard",
+    securityTier: 5,
+    description: "West standby generators and transfer equipment.",
+    sortOrder: 230,
+  },
+  {
+    id: "zone-loading-dock",
+    code: "LOG-DOCK-01",
+    name: "Loading Dock",
+    category: "LOGISTICS",
+    location: "Building 1 · West",
+    securityTier: 2,
+    description: "Controlled freight delivery and pickup point.",
+    sortOrder: 300,
+  },
+  {
+    id: "zone-loading-mantrap",
+    code: "SEC-MAN-DOCK",
+    name: "Loading Dock Mantrap",
+    category: "SECURITY",
+    location: "Building 1 · West",
+    securityTier: 4,
+    description: "Interlocked screening checkpoint between the loading dock and receiving.",
+    sortOrder: 305,
+  },
+  {
+    id: "zone-receiving",
+    code: "LOG-RECV-01",
+    name: "Receiving & Staging",
+    category: "LOGISTICS",
+    location: "Building 1 · West",
+    securityTier: 2,
+    description: "Inspection and short-term staging for deliveries.",
+    sortOrder: 310,
+  },
+  {
+    id: "zone-mechanical",
+    code: "MECH-PLANT-01",
+    name: "Mechanical Plant",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "Building 1 · Level 1",
+    securityTier: 4,
+    description: "Cooling distribution and mechanical controls.",
+    sortOrder: 400,
+  },
+  {
+    id: "zone-noc",
+    code: "OPS-NOC-01",
+    name: "Network Operations Center",
+    category: "OPERATIONS",
+    location: "Building 1 · Level 2",
+    securityTier: 4,
+    description: "Twenty-four-hour operational command center.",
+    sortOrder: 410,
+  },
+  {
+    id: "zone-roof",
+    code: "MECH-ROOF-01",
+    name: "Roof Access",
+    category: "CRITICAL_INFRASTRUCTURE",
+    location: "Building 1 · Roof",
+    securityTier: 4,
+    description: "Restricted access to rooftop cooling equipment.",
+    sortOrder: 420,
+  },
+  {
+    id: "zone-break-room",
+    code: "COM-BRK-01",
+    name: "Break Room",
+    category: "COMMON",
+    location: "Building 1 · Level 1",
+    securityTier: 1,
+    description: "Shared customer and staff amenity space.",
+    sortOrder: 500,
+  },
+  {
+    id: "zone-janitor-closet",
+    code: "SVC-JAN-01",
+    name: "Janitorial Supply Room",
+    category: "SERVICE",
+    location: "Building 1 · Level 1",
+    securityTier: 2,
+    description: "Secured custodial supplies and equipment.",
+    sortOrder: 510,
+  },
+];
+
+const profiles: ProfileSeed[] = [
+  {
+    id: "profile-customer-cage-111",
+    key: "customer-cage-11000",
+    name: "Customer · Cage 11000",
+    description: "Common-area path and Cage 11000 access for a colocated customer.",
+    relationshipType: "CUSTOMER",
+    zoneIds: [
+      "zone-main-gate",
+      "zone-main-entrance",
+      "zone-entrance-mantrap",
+      "zone-security-lobby",
+      "zone-secure-spine",
+      "zone-colo-hall-a",
+      "zone-cage-11000",
+      "zone-break-room",
+    ],
+  },
+  {
+    id: "profile-contractor-facilities",
+    key: "contractor-facilities",
+    name: "Contractor · Facilities Maintenance",
+    description: "Service route to power, cooling, receiving, and staging areas.",
+    relationshipType: "CONTRACTOR",
+    zoneIds: [
+      "zone-main-gate",
+      "zone-main-entrance",
+      "zone-entrance-mantrap",
+      "zone-security-lobby",
+      "zone-secure-spine",
+      "zone-ups-a",
+      "zone-ups-b",
+      "zone-loading-dock",
+      "zone-loading-mantrap",
+      "zone-receiving",
+      "zone-mechanical",
+      "zone-break-room",
+    ],
+  },
+  {
+    id: "profile-engineer-critical",
+    key: "engineer-critical-infrastructure",
+    name: "Engineer · Critical Infrastructure",
+    description: "Full facility operations access for an NY-Secure duty engineer.",
+    relationshipType: "ENGINEER",
+    zoneIds: zones.map((zone) => zone.id),
+  },
+  {
+    id: "profile-vendor-delivery",
+    key: "vendor-delivery",
+    name: "Vendor · Delivery Route",
+    description: "Perimeter, lobby, loading dock, and receiving access.",
+    relationshipType: "VENDOR",
+    zoneIds: [
+      "zone-main-gate",
+      "zone-main-entrance",
+      "zone-entrance-mantrap",
+      "zone-security-lobby",
+      "zone-loading-dock",
+      "zone-loading-mantrap",
+      "zone-receiving",
+    ],
+  },
+  {
+    id: "profile-visitor-escorted",
+    key: "visitor-escorted",
+    name: "Visitor · Escorted Common Areas",
+    description: "Short-duration access to reception and common amenity areas.",
+    relationshipType: "VISITOR",
+    zoneIds: [
+      "zone-main-entrance",
+      "zone-entrance-mantrap",
+      "zone-security-lobby",
+      "zone-break-room",
+    ],
+  },
+  {
+    id: "profile-janitorial-common",
+    key: "janitorial-common-areas",
+    name: "Janitorial · Common Areas",
+    description: "Common-area and custodial supply-room access.",
+    relationshipType: "JANITOR",
+    zoneIds: [
+      "zone-main-entrance",
+      "zone-entrance-mantrap",
+      "zone-security-lobby",
+      "zone-break-room",
+      "zone-janitor-closet",
+    ],
+  },
+];
+
+const people: PersonSeed[] = [
+  {
+    id: "person-amara-okafor",
+    firstName: "Amara",
+    lastName: "Okafor",
+    email: "amara.okafor@ny-secure.example",
+    organizationId: "org-atlas",
+    relationshipType: "ENGINEER",
+    jobFunction: "Critical Facilities Engineer",
+    badgeNumber: "ATL-2041",
+  },
+  {
+    id: "person-eli-mercer",
+    firstName: "Eli",
+    lastName: "Mercer",
+    email: "eli.mercer@northstar.example",
+    organizationId: "org-northstar",
+    relationshipType: "CUSTOMER",
+    jobFunction: "Infrastructure Lead",
+    badgeNumber: "NS-1117",
+  },
+  {
+    id: "person-sofia-reyes",
+    firstName: "Sofia",
+    lastName: "Reyes",
+    email: "sofia.reyes@apex-mechanical.example",
+    organizationId: "org-apex",
+    relationshipType: "CONTRACTOR",
+    jobFunction: "HVAC Technician",
+    badgeNumber: "APX-4932",
+  },
+  {
+    id: "person-noah-patel",
+    firstName: "Noah",
+    lastName: "Patel",
+    email: "noah.patel@meridian-power.example",
+    organizationId: "org-meridian",
+    relationshipType: "VENDOR",
+    jobFunction: "Field Service Representative",
+    badgeNumber: "MPS-7834",
+  },
+  {
+    id: "person-lena-park",
+    firstName: "Lena",
+    lastName: "Park",
+    email: "lena.park@northstar.example",
+    organizationId: "org-northstar",
+    relationshipType: "VISITOR",
+    jobFunction: "Audit Visitor",
+    badgeNumber: "VIS-0208",
+  },
+  {
+    id: "person-caleb-johnson",
+    firstName: "Caleb",
+    lastName: "Johnson",
+    email: "caleb.johnson@brightway.example",
+    organizationId: "org-brightway",
+    relationshipType: "JANITOR",
+    jobFunction: "Custodial Technician",
+    badgeNumber: "BFC-6119",
+  },
+];
+
+const assignments = [
+  ["assignment-amara-engineer", "person-amara-okafor", "profile-engineer-critical", "NY-Secure duty engineer access"],
+  ["assignment-eli-cage-111", "person-eli-mercer", "profile-customer-cage-111", "Citadel Cage 11000 authorization"],
+  ["assignment-sofia-facilities", "person-sofia-reyes", "profile-contractor-facilities", "Preventive maintenance service window"],
+  ["assignment-noah-delivery", "person-noah-patel", "profile-vendor-delivery", "Approved delivery and receiving route"],
+  ["assignment-lena-visitor", "person-lena-park", "profile-visitor-escorted", "Quarterly controls audit visit"],
+  ["assignment-caleb-janitorial", "person-caleb-johnson", "profile-janitorial-common", "Scheduled common-area custodial services"],
+] as const;
+
+const schemaStatements = [
+  `CREATE TABLE IF NOT EXISTS organizations (
+    id TEXT PRIMARY KEY NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    organization_type TEXT NOT NULL,
+    contact_email TEXT,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS zones (
+    id TEXT PRIMARY KEY NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    location TEXT NOT NULL,
+    security_tier INTEGER NOT NULL DEFAULT 1 CHECK (security_tier BETWEEN 1 AND 5),
+    description TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS people (
+    id TEXT PRIMARY KEY NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    organization_id TEXT NOT NULL REFERENCES organizations(id),
+    relationship_type TEXT NOT NULL CHECK (relationship_type IN ('CUSTOMER', 'CONTRACTOR', 'ENGINEER', 'VENDOR', 'VISITOR', 'JANITOR')),
+    job_function TEXT NOT NULL,
+    badge_number TEXT NOT NULL UNIQUE,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS access_profiles (
+    id TEXT PRIMARY KEY NOT NULL,
+    profile_key TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    relationship_type TEXT NOT NULL CHECK (relationship_type IN ('CUSTOMER', 'CONTRACTOR', 'ENGINEER', 'VENDOR', 'VISITOR', 'JANITOR')),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS profile_zone_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    profile_id TEXT NOT NULL REFERENCES access_profiles(id) ON DELETE CASCADE,
+    zone_id TEXT NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    permission TEXT NOT NULL DEFAULT 'ALLOW' CHECK (permission IN ('ALLOW')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (profile_id, zone_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS access_assignments (
+    id TEXT PRIMARY KEY NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id),
+    profile_id TEXT NOT NULL REFERENCES access_profiles(id),
+    valid_from TEXT NOT NULL,
+    valid_until TEXT,
+    reason TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    revoked_at TEXT,
+    revoked_reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (valid_until IS NULL OR datetime(valid_until) > datetime(valid_from))
+  )`,
+  `CREATE TABLE IF NOT EXISTS access_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id),
+    zone_id TEXT NOT NULL REFERENCES zones(id),
+    assignment_id TEXT REFERENCES access_assignments(id),
+    profile_id TEXT REFERENCES access_profiles(id),
+    decision TEXT NOT NULL CHECK (decision IN ('GRANTED', 'DENIED')),
+    reason_code TEXT NOT NULL,
+    explanation TEXT NOT NULL,
+    attempted_at TEXT NOT NULL
+  )`,
+  "CREATE INDEX IF NOT EXISTS idx_zones_category_active ON zones(category, active)",
+  "CREATE INDEX IF NOT EXISTS idx_people_organization_active ON people(organization_id, active)",
+  "CREATE INDEX IF NOT EXISTS idx_people_relationship_type ON people(relationship_type)",
+  "CREATE INDEX IF NOT EXISTS idx_access_profiles_relationship_active ON access_profiles(relationship_type, active)",
+  "CREATE INDEX IF NOT EXISTS idx_profile_zone_rules_zone_permission ON profile_zone_rules(zone_id, permission)",
+  "CREATE INDEX IF NOT EXISTS idx_access_assignments_person_active ON access_assignments(person_id, active)",
+  "CREATE INDEX IF NOT EXISTS idx_access_assignments_profile_active ON access_assignments(profile_id, active)",
+  "CREATE INDEX IF NOT EXISTS idx_access_events_attempted_at ON access_events(attempted_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_access_events_person_attempted_at ON access_events(person_id, attempted_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_access_events_zone_attempted_at ON access_events(zone_id, attempted_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_access_events_decision_attempted_at ON access_events(decision, attempted_at DESC)",
+];
+
+let initializationPromise: Promise<void> | undefined;
+
+export function getDatabase(): D1Database {
+  if (!env.DB) {
+    throw new Error(
+      "The NY-Secure database is unavailable because the D1 binding `DB` is not configured.",
+    );
+  }
+  return env.DB;
+}
+
+async function createSchema(db: D1Database) {
+  await db.batch(schemaStatements.map((statement) => db.prepare(statement)));
+}
+
+async function seedDatabase(db: D1Database) {
+  const now = new Date();
+  const validFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const visitorValidUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  await db.batch(
+    organizations.map((organization) =>
+      db
+        .prepare(
+          `INSERT INTO organizations
+            (id, slug, name, organization_type, contact_email)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             slug = excluded.slug, name = excluded.name,
+             organization_type = excluded.organization_type,
+             contact_email = excluded.contact_email,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(
+          organization.id,
+          organization.slug,
+          organization.name,
+          organization.type,
+          organization.contactEmail,
+        ),
+    ),
+  );
+
+  await db.batch(
+    zones.map((zone) =>
+      db
+        .prepare(
+          `INSERT INTO zones
+            (id, code, name, category, location, security_tier, description, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             code = excluded.code, name = excluded.name,
+             category = excluded.category, location = excluded.location,
+             security_tier = excluded.security_tier,
+             description = excluded.description, sort_order = excluded.sort_order,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(
+          zone.id,
+          zone.code,
+          zone.name,
+          zone.category,
+          zone.location,
+          zone.securityTier,
+          zone.description,
+          zone.sortOrder,
+        ),
+    ),
+  );
+
+  await db.batch(
+    profiles.map((profile) =>
+      db
+        .prepare(
+          `INSERT INTO access_profiles
+            (id, profile_key, name, description, relationship_type)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             profile_key = excluded.profile_key, name = excluded.name,
+             description = excluded.description,
+             relationship_type = excluded.relationship_type,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(
+          profile.id,
+          profile.key,
+          profile.name,
+          profile.description,
+          profile.relationshipType,
+        ),
+    ),
+  );
+
+  const rules = profiles.flatMap((profile) =>
+    profile.zoneIds.map((zoneId) => ({
+      id: `rule-${profile.key}-${zoneId.replace("zone-", "")}`,
+      profileId: profile.id,
+      zoneId,
+    })),
+  );
+
+  await db.batch(
+    rules.map((rule) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO profile_zone_rules
+            (id, profile_id, zone_id, permission)
+           VALUES (?, ?, ?, 'ALLOW')`,
+        )
+        .bind(rule.id, rule.profileId, rule.zoneId),
+    ),
+  );
+
+  await db.batch(
+    people.map((person) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO people
+            (id, first_name, last_name, email, organization_id, relationship_type, job_function, badge_number)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          person.id,
+          person.firstName,
+          person.lastName,
+          person.email,
+          person.organizationId,
+          person.relationshipType,
+          person.jobFunction,
+          person.badgeNumber,
+        ),
+    ),
+  );
+
+  await db.batch(
+    assignments.map(([id, personId, profileId, reason]) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO access_assignments
+            (id, person_id, profile_id, valid_from, valid_until, reason)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          personId,
+          profileId,
+          validFrom,
+          id === "assignment-lena-visitor" ? visitorValidUntil : null,
+          reason,
+        ),
+    ),
+  );
+
+  const seededEvents = [
+    {
+      id: "event-seed-001",
+      personId: "person-eli-mercer",
+      zoneId: "zone-cage-11000",
+      assignmentId: "assignment-eli-cage-111",
+      profileId: "profile-customer-cage-111",
+      decision: "GRANTED",
+      reasonCode: "PROFILE_RULE_MATCH",
+      explanation: "Customer · Cage 11000 permits access to Cage 11000.",
+      minutesAgo: 8,
+    },
+    {
+      id: "event-seed-002",
+      personId: "person-eli-mercer",
+      zoneId: "zone-cage-11010",
+      assignmentId: null,
+      profileId: null,
+      decision: "DENIED",
+      reasonCode: "ZONE_NOT_PERMITTED",
+      explanation: "Active access exists, but none of its profiles permits Cage 11010.",
+      minutesAgo: 21,
+    },
+    {
+      id: "event-seed-003",
+      personId: "person-amara-okafor",
+      zoneId: "zone-generator-west",
+      assignmentId: "assignment-amara-engineer",
+      profileId: "profile-engineer-critical",
+      decision: "GRANTED",
+      reasonCode: "PROFILE_RULE_MATCH",
+      explanation: "Engineer · Critical Infrastructure permits access to West Generator Room.",
+      minutesAgo: 37,
+    },
+    {
+      id: "event-seed-004",
+      personId: "person-sofia-reyes",
+      zoneId: "zone-ups-a",
+      assignmentId: "assignment-sofia-facilities",
+      profileId: "profile-contractor-facilities",
+      decision: "GRANTED",
+      reasonCode: "PROFILE_RULE_MATCH",
+      explanation: "Contractor · Facilities Maintenance permits access to UPS Room A.",
+      minutesAgo: 54,
+    },
+    {
+      id: "event-seed-005",
+      personId: "person-noah-patel",
+      zoneId: "zone-generator-east",
+      assignmentId: null,
+      profileId: null,
+      decision: "DENIED",
+      reasonCode: "ZONE_NOT_PERMITTED",
+      explanation: "Active access exists, but none of its profiles permits East Generator Room.",
+      minutesAgo: 76,
+    },
+    {
+      id: "event-seed-006",
+      personId: "person-caleb-johnson",
+      zoneId: "zone-break-room",
+      assignmentId: "assignment-caleb-janitorial",
+      profileId: "profile-janitorial-common",
+      decision: "GRANTED",
+      reasonCode: "PROFILE_RULE_MATCH",
+      explanation: "Janitorial · Common Areas permits access to Break Room.",
+      minutesAgo: 95,
+    },
+  ];
+
+  await db.batch(
+    seededEvents.map((event) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO access_events
+            (id, person_id, zone_id, assignment_id, profile_id, decision, reason_code, explanation, attempted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          event.id,
+          event.personId,
+          event.zoneId,
+          event.assignmentId,
+          event.profileId,
+          event.decision,
+          event.reasonCode,
+          event.explanation,
+          new Date(now.getTime() - event.minutesAgo * 60 * 1000).toISOString(),
+        ),
+    ),
+  );
+
+  await db.prepare("PRAGMA optimize").run();
+}
+
+export async function ensureDatabase() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      const db = getDatabase();
+      await createSchema(db);
+      await seedDatabase(db);
+    })().catch((error) => {
+      initializationPromise = undefined;
+      throw error;
+    });
+  }
+
+  await initializationPromise;
+  return getDatabase();
+}
