@@ -356,7 +356,7 @@ function normalizeState(source: {
   };
 }
 
-export default function AtlasConsole() {
+export default function NySecureConsole() {
   const [activeView, setActiveView] = useState<View>("overview");
   const [data, setData] = useState<StatePayload | null>(null);
   const [loading, setLoading] = useState(true);

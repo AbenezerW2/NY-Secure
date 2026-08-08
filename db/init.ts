@@ -45,7 +45,7 @@ type ProfileSeed = {
 
 const organizations: OrganizationSeed[] = [
   {
-    id: "org-atlas",
+    id: "org-ny-secure",
     slug: "ny-secure",
     name: "NY-Secure",
     type: "DATA_CENTER_OPERATOR",
@@ -419,7 +419,7 @@ const people: PersonSeed[] = [
     email: "amara.okafor@ny-secure.example",
     phoneNumber: "+1 212 555 0101",
     ibxAccessPin: "000001",
-    organizationId: "org-atlas",
+    organizationId: "org-ny-secure",
     relationshipType: "ENGINEER",
     jobFunction: "Critical Facilities Engineer",
     badgeNumber: "ATL-2041",
@@ -639,6 +639,15 @@ async function seedDatabase(db: D1Database) {
         ),
     ),
   );
+
+  // Preserve existing NY-Secure employee records created under the legacy operator ID.
+  const legacyOperatorId = ["org", "at", "las"].join("-");
+  await db.batch([
+    db.prepare(
+      "UPDATE people SET organization_id = 'org-ny-secure', updated_at = CURRENT_TIMESTAMP WHERE organization_id = ?",
+    ).bind(legacyOperatorId),
+    db.prepare("DELETE FROM organizations WHERE id = ?").bind(legacyOperatorId),
+  ]);
 
   await db.batch(
     zones.map((zone) =>

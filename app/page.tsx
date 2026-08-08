@@ -1,5 +1,5 @@
-import AtlasConsole from "./atlas-console";
+import NySecureConsole from "./ny-secure-console";
 
 export default function Home() {
-  return <AtlasConsole />;
+  return <NySecureConsole />;
 }
