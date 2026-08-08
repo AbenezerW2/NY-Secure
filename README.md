@@ -63,7 +63,9 @@ Search, decision filtering, location filtering, responsive mobile cards, and CSV
 
 The People tab is a search database rather than a roster. First name, last name, company name, and OID are independent search parameters; when more than one is entered, every populated field must match. Typing does not reveal records—the operator must select **Search**. Matching results contain identity and contact fields only, and the single Add person action remains in the page header.
 
-Each result can open a profile card with a blank contact-photo placeholder. The identity summary shows the person’s name, six-digit IBX access PIN, OID, company, and credit-hold state. PINs start at `000001` for the seeded directory and increment for each new person. The profile includes three tabs:
+Each result opens a named tab inside the NY-Secure People workspace—not a browser tab or modal. **Directory search** remains open as the first internal tab, multiple person profiles can stay open beside it, and each person tab can be selected or closed independently. Opening a profile hides the search-result table until the operator returns to Directory search.
+
+The profile card uses a blank contact-photo placeholder. The identity summary shows the person’s name, six-digit IBX access PIN, OID, company, and credit-hold state. PINs start at `000001` for the seeded directory and increment for each new person. The profile includes three tabs:
 
 - **Access** — active cage assignments and their simulated cabinet identifiers.
 - **Access history** — previous grants and denials with location, date, and 24-hour time.

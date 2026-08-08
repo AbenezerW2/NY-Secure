@@ -1128,7 +1128,8 @@ function PeopleView({
   const [company, setCompany] = useState("");
   const [oid, setOid] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState<{ firstName: string; lastName: string; company: string; oid: string } | null>(null);
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const [openPeople, setOpenPeople] = useState<Person[]>([]);
+  const [activePeopleTab, setActivePeopleTab] = useState("search");
   const canSearch = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
   const filteredPeople = useMemo(() => {
     if (!submittedSearch) return [];
@@ -1150,9 +1151,25 @@ function PeopleView({
     setSubmittedSearch({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), oid: oid.trim() });
   }
 
+  function openProfile(person: Person) {
+    setOpenPeople((current) => current.some((item) => item.id === person.id) ? current : [...current, person]);
+    setActivePeopleTab(person.id);
+  }
+
+  function closeProfile(personId: string) {
+    setOpenPeople((current) => current.filter((person) => person.id !== personId));
+    if (activePeopleTab === personId) setActivePeopleTab("search");
+  }
+
+  const activePerson = openPeople.find((person) => person.id === activePeopleTab);
+
   return (
-    <>
-    <section className="panel directory-panel people-directory">
+    <div className="people-workspace">
+      <nav className="people-workspace-tabs" aria-label="Open People tabs">
+        <button className={activePeopleTab === "search" ? "active" : ""} onClick={() => setActivePeopleTab("search")} type="button"><span aria-hidden="true">⌕</span> Directory search</button>
+        {openPeople.map((person) => <div className={activePeopleTab === person.id ? "people-tab-shell active" : "people-tab-shell"} key={person.id}><button className="person-tab" onClick={() => setActivePeopleTab(person.id)} type="button"><span className="mini-contact-photo" aria-hidden="true"><i /></span>{person.firstName} {person.lastName}</button><button className="close-people-tab" aria-label={`Close ${person.firstName} ${person.lastName} profile`} onClick={() => closeProfile(person.id)} type="button">×</button></div>)}
+      </nav>
+    {activePeopleTab === "search" && <section className="panel directory-panel people-directory">
       <div className="people-search-header">
         <div>
           <p className="eyebrow">Directory search</p>
@@ -1170,11 +1187,11 @@ function PeopleView({
         </div>
       </form>
       {!submittedSearch && <div className="people-search-empty"><span>⌕</span><h3>Enter one or more fields, then select Search</h3></div>}
-      {submittedSearch && filteredPeople.length > 0 && <><div className="people-results-meta"><strong>{filteredPeople.length} {filteredPeople.length === 1 ? "result" : "results"}</strong><span>Select View profile for details</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th><th><span className="sr-only">Profile</span></th></tr></thead><tbody>{filteredPeople.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td><td><button className="view-profile-button" onClick={() => setSelectedPerson(person)} type="button">View profile</button></td></tr>; })}</tbody></table></div></>}
+      {submittedSearch && filteredPeople.length > 0 && <><div className="people-results-meta"><strong>{filteredPeople.length} {filteredPeople.length === 1 ? "result" : "results"}</strong><span>Select View profile to open an in-app tab</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th><th><span className="sr-only">Profile</span></th></tr></thead><tbody>{filteredPeople.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td><td><button className="view-profile-button" onClick={() => openProfile(person)} type="button">View profile</button></td></tr>; })}</tbody></table></div></>}
       {submittedSearch && filteredPeople.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the entered first name, last name, company, or OID.</p></div>}
-    </section>
-    {selectedPerson && <PersonProfileCard person={selectedPerson} organization={orgMap.get(selectedPerson.organizationId)} assignments={assignments.filter((assignment) => assignment.personId === selectedPerson.id && assignment.status === "ACTIVE")} profiles={profiles} events={events.filter((event) => event.personId === selectedPerson.id)} zones={zones} onClose={() => setSelectedPerson(null)} />}
-    </>
+    </section>}
+    {activePerson && <PersonProfileCard person={activePerson} organization={orgMap.get(activePerson.organizationId)} assignments={assignments.filter((assignment) => assignment.personId === activePerson.id && assignment.status === "ACTIVE")} profiles={profiles} events={events.filter((event) => event.personId === activePerson.id)} zones={zones} />}
+    </div>
   );
 }
 
@@ -1185,7 +1202,6 @@ function PersonProfileCard({
   profiles,
   events,
   zones,
-  onClose,
 }: {
   person: Person;
   organization?: Organization;
@@ -1193,14 +1209,11 @@ function PersonProfileCard({
   profiles: Map<string, Profile>;
   events: AccessEvent[];
   zones: Map<string, Zone>;
-  onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"access" | "history" | "contact">("access");
   const cageIds = Array.from(new Set(assignments.flatMap((assignment) => profiles.get(assignment.profileId)?.zones ?? []).filter((zoneId) => zones.get(zoneId)?.type === "CAGE" || zoneId.startsWith("zone-cage-"))));
   return (
-    <div className="modal-backdrop profile-card-backdrop" onMouseDown={onClose}>
-      <article className="person-profile-card" role="dialog" aria-modal="true" aria-label={`${person.firstName} ${person.lastName} profile`} onMouseDown={(event) => event.stopPropagation()}>
-        <button className="close-button profile-close" onClick={onClose} type="button" aria-label="Close profile">×</button>
+      <article className="panel person-profile-card person-profile-page" aria-label={`${person.firstName} ${person.lastName} profile`}>
         <aside className="profile-identity">
           <span className="blank-contact-photo" aria-label="No profile photo"><i /><b /></span>
           <h2>{person.firstName} {person.lastName}</h2>
@@ -1225,7 +1238,6 @@ function PersonProfileCard({
           </div>
         </section>
       </article>
-    </div>
   );
 }
 
