@@ -61,7 +61,7 @@ Search, decision filtering, location filtering, responsive mobile cards, and CSV
 
 ## People directory
 
-The People tab is a search database rather than a roster. It shows no person rows until an operator searches by first name, last name, OID, or company. Matching results contain identity and contact fields only: first name, last name, OID, company, phone, work email, and record type. Badge identifiers, effective access, and activity logs are intentionally absent from this tab.
+The People tab is a search database rather than a roster. First name, last name, company name, and OID are independent search parameters; when more than one is entered, every populated field must match. The tab shows no person rows until an operator searches. Matching results contain identity and contact fields only: first name, last name, OID, company, phone, work email, and record type. Badge identifiers, effective access, and activity logs are intentionally absent from this tab. The single Add person action remains in the page header rather than being duplicated inside the search panel.
 
 The current OID is a stable, human-readable identifier derived from the organization slug (for example, `OID-CITADEL-SECURITIES`). This is an interim directory key; the organization-management phase can replace it with a dedicated OID model without changing the search experience.
 
