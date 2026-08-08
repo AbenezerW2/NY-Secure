@@ -211,6 +211,7 @@ export type PersonRow = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber: string;
   organizationId: string;
   organizationName: string;
   organizationType: string;
@@ -234,6 +235,7 @@ export async function getPerson(db: D1Database, personId: string) {
         p.first_name AS firstName,
         p.last_name AS lastName,
         p.email,
+        p.phone_number AS phoneNumber,
         p.organization_id AS organizationId,
         o.name AS organizationName,
         o.organization_type AS organizationType,

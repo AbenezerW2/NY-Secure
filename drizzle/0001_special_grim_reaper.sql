@@ -1,0 +1,1 @@
+ALTER TABLE `people` ADD `phone_number` text DEFAULT '' NOT NULL;

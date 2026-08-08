@@ -18,9 +18,10 @@ The prototype intentionally does not communicate with real readers, controllers,
 - Display settings for light/dark theme, small/comfortable/large text, and compact/comfortable data density
 - Simplified activity history using `Time`, `Who`, `What`, `Where`, and `When`, with all clock times shown in 24-hour format
 - Fictional HFT and network tenants including Citadel Securities, Two Sigma, Hudson River Trading, Jane Street, Lumen Technologies, Zayo, and Boldyn Networks
-- Customer, contractor, engineer, vendor, visitor, and janitorial identities
+- Search-first People directory keyed by first name, last name, provisional organization ID (OID), and company
+- Directory records include work email and phone number; the add form is limited to customers and internal employees
 - Organization and tenant directory
-- Admin workflow to add people, assign profiles, and immediately revoke assignments
+- Identity-only People workflow that keeps badge access and activity administration out of the directory
 - Default-deny badge simulator with a plain-language decision path
 - Persistent Cloudflare D1 records and access-event history
 - Idempotent local seed data and a generated Drizzle migration
@@ -58,6 +59,19 @@ Time (24-hour) | Who | What | Where | When
 
 Search, decision filtering, location filtering, responsive mobile cards, and CSV export use the same simplified field set.
 
+## People directory
+
+The People tab is a search database rather than a roster. It shows no person rows until an operator searches by first name, last name, OID, or company. Matching results contain identity and contact fields only: first name, last name, OID, company, phone, work email, and record type. Badge identifiers, effective access, and activity logs are intentionally absent from this tab.
+
+The current OID is a stable, human-readable identifier derived from the organization slug (for example, `OID-CITADEL-SECURITIES`). This is an interim directory key; the organization-management phase can replace it with a dedicated OID model without changing the search experience.
+
+The Add person form supports two directory record types:
+
+- **Customer** — no job function is requested or stored.
+- **Internal employee** — job function is available with Engineer, Technician, Facilities, Operations, and Other choices.
+
+Phone number is required. Visitors, contractors, and vendors are excluded from this form because external identities will be created by a separate ticket-intake workflow in a later phase. Creating a person here creates a directory record only; it does not expose badge or access controls in the People interface.
+
 ## Run locally
 
 ```bash
@@ -79,7 +93,7 @@ The D1 schema separates identity from authorization:
 
 - `organizations` own people and represent operators, customers, contractors, and vendors
 - `zones` represent controlled facility spaces
-- `people` hold operational identity and badge information
+- `people` hold identity/contact data and legacy simulator credential references; the People UI exposes only identity/contact fields
 - `access_profiles` group reusable policy intent
 - `profile_zone_rules` connect profiles to allowed zones
 - `access_assignments` grant a profile to a person for a validity window

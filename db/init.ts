@@ -24,6 +24,7 @@ type PersonSeed = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber: string;
   organizationId: string;
   relationshipType: string;
   jobFunction: string;
@@ -397,6 +398,7 @@ const people: PersonSeed[] = [
     firstName: "Amara",
     lastName: "Okafor",
     email: "amara.okafor@ny-secure.example",
+    phoneNumber: "+1 212 555 0101",
     organizationId: "org-atlas",
     relationshipType: "ENGINEER",
     jobFunction: "Critical Facilities Engineer",
@@ -407,6 +409,7 @@ const people: PersonSeed[] = [
     firstName: "Eli",
     lastName: "Mercer",
     email: "eli.mercer@citadel-securities.example",
+    phoneNumber: "+1 212 555 0102",
     organizationId: "org-northstar",
     relationshipType: "CUSTOMER",
     jobFunction: "Infrastructure Lead",
@@ -417,6 +420,7 @@ const people: PersonSeed[] = [
     firstName: "Sofia",
     lastName: "Reyes",
     email: "sofia.reyes@jane-street.example",
+    phoneNumber: "+1 212 555 0103",
     organizationId: "org-apex",
     relationshipType: "CONTRACTOR",
     jobFunction: "HVAC Technician",
@@ -427,6 +431,7 @@ const people: PersonSeed[] = [
     firstName: "Noah",
     lastName: "Patel",
     email: "noah.patel@lumen.example",
+    phoneNumber: "+1 212 555 0104",
     organizationId: "org-meridian",
     relationshipType: "VENDOR",
     jobFunction: "Field Service Representative",
@@ -437,6 +442,7 @@ const people: PersonSeed[] = [
     firstName: "Lena",
     lastName: "Park",
     email: "lena.park@citadel-securities.example",
+    phoneNumber: "+1 212 555 0105",
     organizationId: "org-northstar",
     relationshipType: "VISITOR",
     jobFunction: "Audit Visitor",
@@ -447,6 +453,7 @@ const people: PersonSeed[] = [
     firstName: "Caleb",
     lastName: "Johnson",
     email: "caleb.johnson@zayo.example",
+    phoneNumber: "+1 212 555 0106",
     organizationId: "org-brightway",
     relationshipType: "JANITOR",
     jobFunction: "Custodial Technician",
@@ -492,6 +499,7 @@ const schemaStatements = [
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
+    phone_number TEXT NOT NULL DEFAULT '',
     organization_id TEXT NOT NULL REFERENCES organizations(id),
     relationship_type TEXT NOT NULL CHECK (relationship_type IN ('CUSTOMER', 'CONTRACTOR', 'ENGINEER', 'VENDOR', 'VISITOR', 'JANITOR')),
     job_function TEXT NOT NULL,
@@ -684,11 +692,12 @@ async function seedDatabase(db: D1Database) {
       db
         .prepare(
           `INSERT INTO people
-            (id, first_name, last_name, email, organization_id, relationship_type, job_function, badge_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, first_name, last_name, email, phone_number, organization_id, relationship_type, job_function, badge_number)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              first_name = excluded.first_name, last_name = excluded.last_name,
-             email = excluded.email, organization_id = excluded.organization_id,
+             email = excluded.email, phone_number = excluded.phone_number,
+             organization_id = excluded.organization_id,
              relationship_type = excluded.relationship_type,
              job_function = excluded.job_function, badge_number = excluded.badge_number,
              updated_at = CURRENT_TIMESTAMP`,
@@ -698,6 +707,7 @@ async function seedDatabase(db: D1Database) {
           person.firstName,
           person.lastName,
           person.email,
+          person.phoneNumber,
           person.organizationId,
           person.relationshipType,
           person.jobFunction,
@@ -829,6 +839,10 @@ export async function ensureDatabase() {
     initializationPromise = (async () => {
       const db = getDatabase();
       await createSchema(db);
+      const peopleColumns = await db.prepare("PRAGMA table_info(people)").all<{ name: string }>();
+      if (!peopleColumns.results.some((column) => column.name === "phone_number")) {
+        await db.prepare("ALTER TABLE people ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''").run();
+      }
       await seedDatabase(db);
     })().catch((error) => {
       initializationPromise = undefined;

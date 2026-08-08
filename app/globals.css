@@ -892,6 +892,29 @@ select:focus-visible {
 .assignment-chip small { margin-top: 3px; color: #839093; font-size: calc(7px * var(--font-scale)); }
 
 .directory-panel { overflow: hidden; }
+.people-directory { min-height: clamp(460px, 58vh, 720px); }
+.people-search-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 26px 18px; }
+.people-search-header h2 { margin: 3px 0 0; color: #263f45; font-size: calc(18px * var(--font-scale)); letter-spacing: -.025em; }
+.people-search-header > div > p:last-child { margin: 6px 0 0; color: #7c8d90; font-size: calc(9px * var(--font-scale)); }
+.people-search-box { padding: 0 26px 22px; border-bottom: 1px solid #e5eae9; }
+.people-query { display: flex; min-height: 58px; align-items: center; gap: 13px; padding: 0 18px; background: #f7fafc; border: 1px solid #bdcfe5; border-radius: 11px; box-shadow: 0 0 0 3px rgba(42, 110, 238, .06); }
+.people-query > span { color: var(--teal); font-size: calc(20px * var(--font-scale)); line-height: 1; }
+.people-query input { min-width: 0; flex: 1; color: #263f45; background: transparent; border: 0; outline: 0; font-size: calc(12px * var(--font-scale)); }
+.people-query input::placeholder { color: #96a5aa; }
+.search-keywords { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.search-keywords span { padding: 5px 8px; color: #536d88; background: #edf4fc; border-radius: 999px; font-size: calc(7px * var(--font-scale)); font-weight: 650; }
+.people-search-empty { display: grid; max-width: 470px; place-items: center; gap: 7px; margin: 68px auto; padding: 0 24px; text-align: center; }
+.people-search-empty > span { display: grid; width: 52px; height: 52px; place-items: center; color: var(--teal); background: var(--blue-soft); border-radius: 50%; font-size: calc(22px * var(--font-scale)); }
+.people-search-empty h3 { margin: 7px 0 0; color: #314a50; font-size: calc(14px * var(--font-scale)); }
+.people-search-empty p { margin: 0; color: #819095; font-size: calc(9px * var(--font-scale)); line-height: 1.55; }
+.people-results-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 26px; color: #75868a; border-bottom: 1px solid #e5eae9; font-size: calc(8px * var(--font-scale)); }
+.people-results-meta strong { color: #344d53; font-size: calc(9px * var(--font-scale)); }
+.identity-results { min-width: 980px; }
+.identity-results tbody tr { cursor: default; }
+.identity-results td { font-size: calc(8.5px * var(--font-scale)); }
+.identity-results td > a { color: #38659a; text-decoration: none; }
+.identity-results td > a:hover { text-decoration: underline; }
+.people-no-results { margin: 55px auto; }
 .directory-toolbar { display: flex; min-height: 62px; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #e5eae9; }
 .table-search { display: flex; width: 220px; height: 35px; align-items: center; gap: 8px; padding: 0 10px; color: #8a9799; background: #f7f9f8; border: 1px solid #dfe6e4; border-radius: 7px; }
 .table-search input { min-width: 0; flex: 1; background: none; border: 0; outline: 0; color: #334b50; font-size: calc(9px * var(--font-scale)); }
@@ -1448,6 +1471,15 @@ select:focus-visible {
 .app-shell[data-theme="dark"] :is(.global-search kbd, .secondary-button, .export-button, .toolbar-filters select) { color: var(--ink); background: #16263d; border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.directory-toolbar, .data-table th, .data-table td, .panel-header, .zone-strip, .map-legend, .drawer-tabs, .drawer-section, .settings-header, .settings-section, .settings-footer) { border-color: var(--line); }
 .app-shell[data-theme="dark"] .data-table tbody tr:hover { background: #16263d; }
+.app-shell[data-theme="dark"] .people-query { background: #0c1728; border-color: #315889; box-shadow: 0 0 0 3px rgba(77, 140, 255, .08); }
+.app-shell[data-theme="dark"] .people-query input,
+.app-shell[data-theme="dark"] .people-search-header h2,
+.app-shell[data-theme="dark"] .people-search-empty h3,
+.app-shell[data-theme="dark"] .people-results-meta strong { color: var(--ink); }
+.app-shell[data-theme="dark"] .people-search-box,
+.app-shell[data-theme="dark"] .people-results-meta { border-color: var(--line); }
+.app-shell[data-theme="dark"] .search-keywords span { color: #a9c8ff; background: #17345f; }
+.app-shell[data-theme="dark"] .identity-results td > a { color: #8db9ff; }
 .app-shell[data-theme="dark"] .data-table tbody tr:focus-within { background: #1a2d48; }
 .app-shell[data-theme="dark"] .tree-branch button:hover,
 .app-shell[data-theme="dark"] .tree-branch button.active { color: #a9c8ff; background: #17345f; }
@@ -1507,4 +1539,32 @@ select:focus-visible {
   .event-what,
   .event-where { display: none; }
   .settings-drawer { width: 100%; }
+  .people-search-header { align-items: flex-start; padding: 19px 17px 15px; }
+  .people-search-header .primary-button { min-height: 36px; padding-inline: 12px; white-space: nowrap; }
+  .people-search-box { padding: 0 17px 17px; }
+  .people-query { min-height: 50px; padding-inline: 13px; }
+  .people-query input { font-size: calc(10px * var(--font-scale)); }
+  .people-results-meta { align-items: flex-start; flex-direction: column; padding-inline: 17px; }
+  .identity-results { min-width: 0; }
+  .identity-results thead { display: none; }
+  .identity-results,
+  .identity-results tbody,
+  .identity-results tr,
+  .identity-results td,
+  .identity-results th:nth-child(2),
+  .identity-results td:nth-child(2),
+  .identity-results th:nth-child(3),
+  .identity-results td:nth-child(3),
+  .identity-results th:nth-child(5),
+  .identity-results td:nth-child(5) { display: block; width: 100%; }
+  .identity-results tr { padding: 14px 17px; border-bottom: 1px solid var(--line); }
+  .identity-results td { display: grid !important; grid-template-columns: 95px minmax(0, 1fr); min-width: 0; gap: 10px; padding: 5px 0; border: 0; overflow-wrap: anywhere; }
+  .identity-results td::before { color: #87969a; font-size: calc(7px * var(--font-scale)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .identity-results td:nth-child(1)::before { content: "First name"; }
+  .identity-results td:nth-child(2)::before { content: "Last name"; }
+  .identity-results td:nth-child(3)::before { content: "OID"; }
+  .identity-results td:nth-child(4)::before { content: "Company"; }
+  .identity-results td:nth-child(5)::before { content: "Phone"; }
+  .identity-results td:nth-child(6)::before { content: "Work email"; }
+  .identity-results td:nth-child(7)::before { content: "Record type"; }
 }

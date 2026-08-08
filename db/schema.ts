@@ -50,6 +50,7 @@ export const people = sqliteTable(
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
     email: text("email").notNull(),
+    phoneNumber: text("phone_number").notNull().default(""),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id),

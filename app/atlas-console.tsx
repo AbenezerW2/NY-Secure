@@ -14,6 +14,7 @@ type View =
 
 type Organization = {
   id: string;
+  oid: string;
   name: string;
   type: string;
   status: string;
@@ -34,6 +35,7 @@ type Person = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber: string;
   organizationId: string;
   organizationName?: string;
   relationshipType: string;
@@ -146,8 +148,8 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; subtitle: string
   },
   people: {
     eyebrow: "Identity directory",
-    title: "People & credentials",
-    subtitle: "Manage everyone who can request or receive physical access.",
+    title: "People",
+    subtitle: "Search the identity database by name, OID, or company.",
   },
   organizations: {
     eyebrow: "Colocation directory",
@@ -225,6 +227,7 @@ function normalizeState(source: {
 }): StatePayload {
   const organizations: Organization[] = (source.organizations ?? []).map((item) => ({
     id: String(item.id),
+    oid: `OID-${String(item.slug ?? item.id).replace(/^org-/, "").replaceAll("_", "-").toUpperCase()}`,
     name: String(item.name),
     type: String(item.type ?? item.organizationType ?? "ORGANIZATION"),
     status: item.active === false ? "INACTIVE" : "ACTIVE",
@@ -269,6 +272,7 @@ function normalizeState(source: {
     firstName: String(item.firstName),
     lastName: String(item.lastName),
     email: String(item.email),
+    phoneNumber: String(item.phoneNumber ?? ""),
     organizationId: String(item.organizationId),
     organizationName: String(item.organizationName ?? organizationNames.get(String(item.organizationId)) ?? ""),
     relationshipType: String(item.relationshipType ?? "OTHER"),
@@ -367,8 +371,6 @@ export default function AtlasConsole() {
   } | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
-  const [showAccess, setShowAccess] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
 
   const loadState = useCallback(async () => {
     setLoading(true);
@@ -488,17 +490,14 @@ export default function AtlasConsole() {
 
   const filteredPeople = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return data?.people ?? [];
+    if (!needle) return [];
     return (data?.people ?? []).filter((person) =>
       [
         person.firstName,
         person.lastName,
-        person.email,
         person.organizationName,
         orgMap.get(person.organizationId)?.name,
-        person.relationshipType,
-        person.jobFunction,
-        person.badgeId,
+        orgMap.get(person.organizationId)?.oid,
       ]
         .join(" ")
         .toLowerCase()
@@ -540,11 +539,6 @@ export default function AtlasConsole() {
     } finally {
       setSimulating(false);
     }
-  }
-
-  function openPerson(person: Person, manageAccess = false) {
-    setSelectedPerson(person);
-    setShowAccess(manageAccess);
   }
 
   const viewCopy = VIEW_COPY[activeView];
@@ -713,12 +707,10 @@ export default function AtlasConsole() {
               {activeView === "people" && (
                 <PeopleView
                   people={filteredPeople}
-                  assignments={data.assignments}
+                  allPeopleCount={data.people.length}
                   orgMap={orgMap}
-                  profileMap={profileMap}
                   query={query}
                   setQuery={setQuery}
-                  onOpen={openPerson}
                   onAdd={() => setShowAddPerson(true)}
                 />
               )}
@@ -748,34 +740,6 @@ export default function AtlasConsole() {
           onClose={() => setShowAddPerson(false)}
           onSaved={async (message) => {
             setShowAddPerson(false);
-            setFlash({ tone: "success", message });
-            await loadState();
-          }}
-        />
-      )}
-
-      {selectedPerson && data && !showAccess && (
-        <PersonDrawer
-          person={selectedPerson}
-          organization={orgMap.get(selectedPerson.organizationId)}
-          assignments={activeAssignmentsFor(selectedPerson.id)}
-          profiles={profileMap}
-          events={data.events.filter((event) => event.personId === selectedPerson.id)}
-          onClose={() => setSelectedPerson(null)}
-          onManage={() => setShowAccess(true)}
-        />
-      )}
-
-      {selectedPerson && data && showAccess && (
-        <AccessDialog
-          person={selectedPerson}
-          profiles={data.profiles}
-          assignments={activeAssignmentsFor(selectedPerson.id)}
-          onClose={() => {
-            setShowAccess(false);
-            setSelectedPerson(null);
-          }}
-          onSaved={async (message) => {
             setFlash({ tone: "success", message });
             await loadState();
           }}
@@ -1153,52 +1117,37 @@ function Operations({
 
 function PeopleView({
   people,
-  assignments,
+  allPeopleCount,
   orgMap,
-  profileMap,
   query,
   setQuery,
-  onOpen,
   onAdd,
 }: {
   people: Person[];
-  assignments: Assignment[];
+  allPeopleCount: number;
   orgMap: Map<string, Organization>;
-  profileMap: Map<string, Profile>;
   query: string;
   setQuery: (value: string) => void;
-  onOpen: (person: Person, manageAccess?: boolean) => void;
   onAdd: () => void;
 }) {
+  const hasQuery = query.trim().length > 0;
   return (
-    <section className="panel directory-panel">
-      <div className="directory-toolbar">
-        <label className="table-search"><span>⌕</span><input placeholder="Search directory…" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-        <div className="toolbar-filters"><button type="button">All types <span>⌄</span></button><button type="button">All organizations <span>⌄</span></button><button type="button">Credential status <span>⌄</span></button></div>
-        <span className="result-count">{people.length} people</span>
+    <section className="panel directory-panel people-directory">
+      <div className="people-search-header">
+        <div>
+          <p className="eyebrow">Directory search</p>
+          <h2>Find a person</h2>
+          <p>Search by first name, last name, OID, or company.</p>
+        </div>
+        <button className="primary-button" onClick={onAdd} type="button">Add person</button>
       </div>
-      <div className="table-wrap">
-        <table className="data-table people-table">
-          <thead><tr><th>Person</th><th>Organization</th><th>Relationship</th><th>Credential</th><th>Effective access</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
-          <tbody>
-            {people.map((person, index) => {
-              const personAssignments = assignments.filter((assignment) => assignment.personId === person.id && assignment.status === "ACTIVE");
-              return (
-                <tr key={person.id} onClick={() => onOpen(person)}>
-                  <td><div className="person-cell"><span className={`avatar hue-${index % 5}`}>{initials(person.firstName, person.lastName)}</span><span><strong>{person.firstName} {person.lastName}</strong><small>{person.email}</small></span></div></td>
-                  <td><strong className="org-name">{person.organizationName || orgMap.get(person.organizationId)?.name}</strong></td>
-                  <td><span className="type-pill">{label(person.relationshipType)}</span><small className="job-label">{label(person.jobFunction)}</small></td>
-                  <td><code>{person.badgeId}</code><small className={`badge-line ${person.badgeStatus.toLowerCase()}`}><i />{label(person.badgeStatus)}</small></td>
-                  <td><div className="access-stack">{personAssignments.slice(0, 2).map((assignment) => <span key={assignment.id}>{profileMap.get(assignment.profileId)?.name}</span>)}{personAssignments.length > 2 && <small>+{personAssignments.length - 2} more</small>}{personAssignments.length === 0 && <em>No access assigned</em>}</div></td>
-                  <td><span className={`status-pill ${person.status.toLowerCase()}`}><i />{label(person.status)}</span></td>
-                  <td><button className="row-action" onClick={(event) => { event.stopPropagation(); onOpen(person, true); }} type="button">Manage access</button></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="people-search-box">
+        <label className="people-query"><span aria-hidden="true">⌕</span><input aria-label="Search people database" placeholder="Try “Amara”, “Citadel”, or “OID-CITADEL-SECURITIES”" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus /></label>
+        <div className="search-keywords" aria-label="Supported search fields"><span>First name</span><span>Last name</span><span>OID</span><span>Company</span></div>
       </div>
-      {people.length === 0 && <div className="table-empty"><span>⌕</span><h3>No people found</h3><p>Try another search or add a new person.</p><button className="primary-button" onClick={onAdd} type="button">Add person</button></div>}
+      {!hasQuery && <div className="people-search-empty"><span>⌕</span><h3>Search the people database</h3><p>{allPeopleCount} records are indexed. Results stay hidden until you search, so the directory remains useful as it grows.</p></div>}
+      {hasQuery && people.length > 0 && <><div className="people-results-meta"><strong>{people.length} {people.length === 1 ? "result" : "results"}</strong><span>Matched against name, OID, and company</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th></tr></thead><tbody>{people.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td></tr>; })}</tbody></table></div></>}
+      {hasQuery && people.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the spelling or try a first name, last name, OID, or company.</p><button className="primary-button" onClick={onAdd} type="button">Add person</button></div>}
     </section>
   );
 }
@@ -1412,25 +1361,10 @@ function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayloa
   );
 }
 
-function PersonDrawer({ person, organization, assignments, profiles, events, onClose, onManage }: { person: Person; organization?: Organization; assignments: Assignment[]; profiles: Map<string, Profile>; events: AccessEvent[]; onClose: () => void; onManage: () => void }) {
-  return (
-    <div className="drawer-backdrop" onMouseDown={onClose}>
-      <aside className="person-drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <button className="close-button" onClick={onClose} type="button" aria-label="Close">×</button>
-        <div className="drawer-profile"><span className="avatar drawer-avatar">{initials(person.firstName, person.lastName)}</span><div><span className={`status-pill ${person.status.toLowerCase()}`}><i />{label(person.status)}</span><h2>{person.firstName} {person.lastName}</h2><p>{label(person.jobFunction)} · {organization?.name}</p></div></div>
-        <div className="drawer-tabs"><button className="active" type="button">Access</button><button type="button">Credential</button><button type="button">Activity</button></div>
-        <div className="drawer-section"><div className="drawer-section-title"><div><p className="eyebrow">Effective access</p><h3>{assignments.length} active assignments</h3></div><button onClick={onManage} type="button">Manage</button></div><div className="drawer-assignments">{assignments.map((assignment) => { const profile = profiles.get(assignment.profileId); return <div key={assignment.id}><span className="policy-icon policy-hue-1">◆</span><div><strong>{profile?.name}</strong><small>{profile?.schedule} · {formatDate(assignment.validUntil)}</small></div></div>; })}{assignments.length === 0 && <p className="empty-copy">No active access. This credential will deny by default.</p>}</div></div>
-        <div className="drawer-section"><p className="eyebrow">Credential</p><div className="credential-card"><div><small>Physical badge</small><code>{person.badgeId}</code></div><span className={`credential-pill ${person.badgeStatus.toLowerCase()}`}><i />{label(person.badgeStatus)}</span></div></div>
-        <div className="drawer-section"><p className="eyebrow">Recent decisions</p><div className="event-feed compact">{events.slice(0, 3).map((event) => <EventFeedItem key={event.id} event={event} />)}{events.length === 0 && <p className="empty-copy">No recent activity for this person.</p>}</div></div>
-        <button className="primary-button drawer-action" onClick={onManage} type="button">Manage access</button>
-      </aside>
-    </div>
-  );
-}
-
 function AddPersonDialog({ organizations, onClose, onSaved }: { organizations: Organization[]; onClose: () => void; onSaved: (message: string) => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [recordType, setRecordType] = useState<"CUSTOMER" | "ENGINEER">("CUSTOMER");
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
@@ -1442,34 +1376,22 @@ function AddPersonDialog({ organizations, onClose, onSaved }: { organizations: O
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "Person could not be added."); setSaving(false); }
   }
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><form className="modal" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}><div className="modal-header"><div><p className="eyebrow">Identity directory</p><h2>Add a person</h2><p>New people start with an active credential and no physical access.</p></div><button className="close-button" onClick={onClose} type="button">×</button></div><div className="form-grid"><label><span>First name</span><input name="firstName" required placeholder="e.g. Daniela" autoFocus /></label><label><span>Last name</span><input name="lastName" required placeholder="e.g. Okafor" /></label><label className="full-field"><span>Work email</span><input type="email" name="email" required placeholder="name@company.com" /></label><label className="full-field"><span>Organization</span><select name="organizationId" required defaultValue={organizations[0]?.id}>{organizations.map((org) => <option value={org.id} key={org.id}>{org.name} · {label(org.type)}</option>)}</select></label><label><span>Relationship</span><select name="relationshipType" defaultValue="CONTRACTOR"><option>CUSTOMER</option><option>CONTRACTOR</option><option>EMPLOYEE</option><option>VENDOR</option><option>VISITOR</option></select></label><label><span>Job function</span><select name="jobFunction" defaultValue="TECHNICIAN"><option>ENGINEER</option><option>TECHNICIAN</option><option>JANITOR</option><option>SECURITY</option><option>DELIVERY</option><option>OTHER</option></select></label></div><div className="info-callout"><span>i</span><p><strong>Default deny is on.</strong> After creating this person, use Manage access to assign a time-bounded policy.</p></div>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Cancel</button><button className="primary-button" disabled={saving} type="submit">{saving ? "Adding…" : "Add person"}</button></div></form></div>
-  );
-}
-
-function AccessDialog({ person, profiles, assignments, onClose, onSaved }: { person: Person; profiles: Profile[]; assignments: Assignment[]; onClose: () => void; onSaved: (message: string) => void }) {
-  const [selectedProfileId, setSelectedProfileId] = useState(profiles.find((profile) => !assignments.some((assignment) => assignment.profileId === profile.id))?.id ?? profiles[0]?.id ?? "");
-  const [validUntil, setValidUntil] = useState(() => { const date = new Date(); date.setDate(date.getDate() + 7); return date.toISOString().slice(0, 10); });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  async function assign() {
-    setSaving(true); setError("");
-    try {
-      const response = await fetch("/api/access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ personId: person.id, profileId: selectedProfileId, validUntil: validUntil ? `${validUntil}T23:59:59.000Z` : null, reason: "Approved in NY-Secure Control" }) });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Access could not be assigned.");
-      onSaved(`${profiles.find((profile) => profile.id === selectedProfileId)?.name} assigned to ${person.firstName}.`);
-    } catch (assignError) { setError(assignError instanceof Error ? assignError.message : "Access could not be assigned."); } finally { setSaving(false); }
-  }
-  async function revoke(assignment: Assignment) {
-    setSaving(true); setError("");
-    try {
-      const response = await fetch("/api/access", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ assignmentId: assignment.id, reason: "Revoked by security administrator" }) });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Access could not be revoked.");
-      onSaved(`${profiles.find((profile) => profile.id === assignment.profileId)?.name} revoked from ${person.firstName}.`);
-    } catch (revokeError) { setError(revokeError instanceof Error ? revokeError.message : "Access could not be revoked."); } finally { setSaving(false); }
-  }
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}><div className="modal access-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><div className="modal-header"><div><p className="eyebrow">Least-privilege assignment</p><h2>Manage {person.firstName}’s access</h2><p>Changes are effective immediately and recorded in the administrative history.</p></div><button className="close-button" onClick={onClose} type="button">×</button></div><div className="current-access"><p className="eyebrow">Active now · {assignments.length}</p>{assignments.length === 0 && <div className="no-access-state"><span>⊘</span><p><strong>No active access</strong><small>All controlled zones will deny by default.</small></p></div>}{assignments.map((assignment) => { const profile = profiles.find((item) => item.id === assignment.profileId); return <div className="current-assignment" key={assignment.id}><span className="policy-icon policy-hue-2">◆</span><div><strong>{profile?.name}</strong><small>{profile?.schedule} · {formatDate(assignment.validUntil)}</small></div><button disabled={saving} onClick={() => revoke(assignment)} type="button">Revoke</button></div>; })}</div><div className="new-assignment"><p className="eyebrow">Assign a profile</p><label><span>Access policy</span><select value={selectedProfileId} onChange={(event) => setSelectedProfileId(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name} · {profile.schedule}</option>)}</select></label><div className="profile-preview">{profiles.filter((profile) => profile.id === selectedProfileId).map((profile) => <div key={profile.id}><span className="policy-icon policy-hue-1">◆</span><div><strong>{profile.name}</strong><p>{profile.description}</p><small>{profile.zoneCount ?? profile.zones?.length ?? 0} covered zones · {profile.schedule}</small></div></div>)}</div><label><span>Access expires at end of day</span><input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label></div>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Done</button><button className="primary-button" disabled={saving || !selectedProfileId} onClick={assign} type="button">{saving ? "Saving…" : "Assign access"}</button></div></div></div>
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <form className="modal" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header"><div><p className="eyebrow">Identity directory</p><h2>Add a person</h2><p>Create a directory record. Badge access and activity are managed outside this board.</p></div><button className="close-button" onClick={onClose} type="button" aria-label="Close">×</button></div>
+        <div className="form-grid">
+          <label><span>First name</span><input name="firstName" required placeholder="e.g. Daniela" autoFocus /></label>
+          <label><span>Last name</span><input name="lastName" required placeholder="e.g. Okafor" /></label>
+          <label><span>Work email</span><input type="email" name="email" required placeholder="name@company.com" /></label>
+          <label><span>Phone number</span><input type="tel" name="phoneNumber" required autoComplete="tel" placeholder="+1 212 555 0100" /></label>
+          <label className="full-field"><span>Company / organization</span><select name="organizationId" required defaultValue={organizations[0]?.id}>{organizations.map((org) => <option value={org.id} key={org.id}>{org.name} · {org.oid}</option>)}</select></label>
+          <label><span>Record type</span><select name="relationshipType" value={recordType} onChange={(event) => setRecordType(event.target.value as typeof recordType)}><option value="CUSTOMER">Customer</option><option value="ENGINEER">Internal employee</option></select></label>
+          {recordType === "ENGINEER" ? <label><span>Job function</span><select name="jobFunction" defaultValue="ENGINEER"><option value="ENGINEER">Engineer</option><option value="TECHNICIAN">Technician</option><option value="FACILITIES">Facilities</option><option value="OPERATIONS">Operations</option><option value="OTHER">Other</option></select></label> : <input type="hidden" name="jobFunction" value="NOT_APPLICABLE" />}
+        </div>
+        <div className="info-callout"><span>i</span><p><strong>External intake stays separate.</strong> Visitors, contractors, and vendors will enter through the future ticket workflow, not this form.</p></div>
+        {error && <p className="form-error">{error}</p>}
+        <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Cancel</button><button className="primary-button" disabled={saving} type="submit">{saving ? "Adding…" : "Add person"}</button></div>
+      </form>
+    </div>
   );
 }

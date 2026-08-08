@@ -71,18 +71,28 @@ Boldyn Networks         NETWORK_PROVIDER
 
 The interface rotates the fictional HFT and network organizations across cage ownership labels for demonstration. The simulator does not claim real-world occupancy or customer relationships.
 
-### People and operational roles — `IMPLEMENTED`
+### People directory — `IMPLEMENTED`
 
-Supported relationship types:
+The People tab is an identity/contact search database. It intentionally does not render a full roster before a query and does not expose badge, access-assignment, credential-status, or activity-log controls.
 
 ```text
-CUSTOMER
-CONTRACTOR
-ENGINEER
-VENDOR
-VISITOR
-JANITOR
+SEARCH KEYS
+first_name
+last_name
+OID
+company
+
+RESULT FIELDS
+first_name
+last_name
+OID
+company
+phone_number
+work_email
+record_type
 ```
+
+OID currently uses a stable human-readable value derived from the organization slug, such as `OID-CITADEL-SECURITIES`. A dedicated OID data model is reserved for the later organization-management phase.
 
 Identity and authorization are deliberately separate:
 
@@ -97,12 +107,19 @@ Administrators can add a person with:
 first_name
 last_name
 work_email
+phone_number
 organization
-relationship_type
-job_function
+record_type = CUSTOMER | INTERNAL_EMPLOYEE
+job_function = required only for INTERNAL_EMPLOYEE
 ```
 
-New people receive a generated simulated badge but begin with no access. Default deny applies until an administrator assigns an access profile.
+Internal employee job-function choices are Engineer, Technician, Facilities, Operations, and Other. Customer records do not have a job function. Security and Janitor are not selectable.
+
+Visitor, contractor, and vendor creation is intentionally unavailable from this directory. These external records will be sourced from a separate ticket-intake workflow in a future phase.
+
+The API retains a private unique directory reference to satisfy the existing simulator data model, but the People interface neither labels nor exposes it as a badge. Badge access and badge activity administration belong in a separate surface.
+
+Legacy simulator seeds still include external identities so existing access-decision scenarios remain testable; this does not make those identity types creatable in the People form.
 
 ### Credentials — `IMPLEMENTED`
 
@@ -280,7 +297,7 @@ Clickable photo-backed summary logs
 Live facility map
 Light/dark theme switcher
 Adjustable text size and layout density
-People and credential directory
+Search-first People identity/contact directory
 Organization and tenant directory
 Access policy catalog
 Facility hierarchy and zone inspector
@@ -306,6 +323,8 @@ The escorted visitor profile and visitor identity type exist. NY-Secure does not
 
 ```text
 PLANNED administrator authentication and role-based permissions
+PLANNED separate badge-access administration surface
+PLANNED ticket-sourced external identity intake
 PLANNED reader, door, and controller inventory
 PLANNED recurring schedules and holiday exceptions
 PLANNED visitor sponsors, check-in, check-out, and escort validation

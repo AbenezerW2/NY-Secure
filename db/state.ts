@@ -110,7 +110,8 @@ export async function getState(db: D1Database) {
       .prepare(
         `SELECT
           p.id, p.first_name AS firstName, p.last_name AS lastName,
-          p.email, p.organization_id AS organizationId,
+          p.email, p.phone_number AS phoneNumber,
+          p.organization_id AS organizationId,
           o.name AS organizationName, o.organization_type AS organizationType,
           p.relationship_type AS relationshipType,
           p.job_function AS jobFunction, p.badge_number AS badgeNumber,
@@ -271,4 +272,3 @@ export async function getState(db: D1Database) {
     },
   };
 }
-
