@@ -8,16 +8,8 @@ import {
 } from "@/db/api";
 import { ensureDatabase } from "@/db/init";
 
-function createBadgeNumber(relationshipType: string) {
-  const prefixes: Record<string, string> = {
-    CUSTOMER: "CUS",
-    CONTRACTOR: "CON",
-    ENGINEER: "ENG",
-    VENDOR: "VEN",
-    VISITOR: "VIS",
-    JANITOR: "JAN",
-  };
-  return `${prefixes[relationshipType]}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+function createDirectoryReference() {
+  return `DIR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 export async function POST(request: Request) {
@@ -26,6 +18,7 @@ export async function POST(request: Request) {
     const firstName = requiredString(payload, "firstName", "firstName", 80);
     const lastName = requiredString(payload, "lastName", "lastName", 80);
     const email = requiredString(payload, "email", "email", 254).toLowerCase();
+    const phoneNumber = requiredString(payload, "phoneNumber", "phoneNumber", 40);
     const organizationId = requiredString(
       payload,
       "organizationId",
@@ -35,11 +28,18 @@ export async function POST(request: Request) {
     const relationshipType = parseRelationshipType(
       requiredString(payload, "relationshipType", "relationshipType", 30),
     );
-    const jobFunction = requiredString(payload, "jobFunction", "jobFunction", 120);
+    const requestedJobFunction = requiredString(payload, "jobFunction", "jobFunction", 120);
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new ApiError(400, "INVALID_EMAIL", "email must be a valid email address.");
     }
+    if (!/^[+()0-9.\-\s]{7,40}$/.test(phoneNumber)) {
+      throw new ApiError(400, "INVALID_PHONE", "phoneNumber must be a valid phone number.");
+    }
+    if (relationshipType !== "CUSTOMER" && relationshipType !== "ENGINEER") {
+      throw new ApiError(400, "INVALID_DIRECTORY_TYPE", "This directory accepts only customers and internal employees.");
+    }
+    const jobFunction = relationshipType === "ENGINEER" ? requestedJobFunction : "NOT_APPLICABLE";
 
     const db = await ensureDatabase();
     const organization = await db
@@ -70,20 +70,22 @@ export async function POST(request: Request) {
     }
 
     const id = `person-${crypto.randomUUID()}`;
-    const badgeNumber = createBadgeNumber(relationshipType);
+    // The legacy schema requires a unique reference. It is intentionally not exposed as a badge.
+    const badgeNumber = createDirectoryReference();
     const now = new Date().toISOString();
     await db
       .prepare(
         `INSERT INTO people
-          (id, first_name, last_name, email, organization_id, relationship_type,
+          (id, first_name, last_name, email, phone_number, organization_id, relationship_type,
            job_function, badge_number, active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       )
       .bind(
         id,
         firstName,
         lastName,
         email,
+        phoneNumber,
         organizationId,
         relationshipType,
         jobFunction,
@@ -114,4 +116,3 @@ export async function POST(request: Request) {
     return apiErrorResponse(error);
   }
 }
-
