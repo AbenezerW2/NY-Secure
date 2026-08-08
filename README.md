@@ -14,6 +14,9 @@ The prototype intentionally does not communicate with real readers, controllers,
 - Interactive DC-01 floor plan with a Main Entrance Mantrap, Loading Dock Mantrap, secure spine, UPS rooms, generator rooms, NOC, receiving, and supporting areas
 - Complete 62-cage inventory: Hall A uses `11000` through `11300` and Hall B uses `22000` through `22300`, both in increments of 10
 - Clickable People on site, Active credentials, Access granted, and Access denied summary cards with photo-backed detail logs
+- A clean, user-configurable overview: the home page starts blank and each operator chooses the widgets they want to see
+- Display settings for light/dark theme, small/comfortable/large text, and compact/comfortable data density
+- Simplified activity history using `Time`, `Who`, `What`, `Where`, and `When`, with all clock times shown in 24-hour format
 - Fictional HFT and network tenants including Citadel Securities, Two Sigma, Hudson River Trading, Jane Street, Lumen Technologies, Zayo, and Boldyn Networks
 - Customer, contractor, engineer, vendor, visitor, and janitorial identities
 - Organization and tenant directory
@@ -43,7 +46,17 @@ Each overview summary card is an interactive tab into a focused log drawer:
 - **Access granted** shows successful access events with photos, zones, explanations, and timestamps.
 - **Access denied** shows denied events with photos, reason context, zones, and timestamps.
 
-The light/dark selector is a device-local display preference stored in the browser. Security identities, assignments, zones, and access events remain durable D1 records.
+The overview starts as a clean canvas. Operators can open **Customize overview** or the settings menu to add the security summary, facility map, recent activity, attention queue, and on-site roster in any combination. Leaving every widget disabled keeps the home page blank.
+
+The settings menu also controls light/dark appearance, three text sizes, and compact or comfortable data density. These device-local display preferences are stored in the browser. Security identities, assignments, zones, and access events remain durable D1 records.
+
+The full activity view deliberately omits organization and event-ID columns. It presents only:
+
+```text
+Time (24-hour) | Who | What | Where | When
+```
+
+Search, decision filtering, location filtering, responsive mobile cards, and CSV export use the same simplified field set.
 
 ## Run locally
 

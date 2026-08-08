@@ -13,6 +13,10 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /NY-Secure · DC-01/);
   assert.match(consoleSource, /StatLogDrawer/);
   assert.match(consoleSource, /zone-cage-11000/);
+  assert.match(consoleSource, /Start with a clean canvas/);
+  assert.match(consoleSource, /Open display and dashboard settings/);
+  assert.match(consoleSource, /Time<\/th><th>Who<\/th><th>What<\/th><th>Where<\/th><th>When/);
+  assert.match(consoleSource, /hour12:\s*false/);
   assert.match(consoleSource, /Simulate access/);
   assert.doesNotMatch(`${layout}\n${consoleSource}`, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });

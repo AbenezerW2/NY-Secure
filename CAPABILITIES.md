@@ -241,21 +241,52 @@ These views derive their identities and event details from the current simulator
 
 ### Visual theme — `IMPLEMENTED`
 
-NY-Secure uses a white-and-cobalt-blue light theme and a navy dark theme. The theme switcher stores only the display preference in browser storage. It does not move identities, assignments, zones, or event history out of D1.
+NY-Secure uses a white-and-cobalt-blue light theme and a fully surfaced navy dark theme. Display settings provide small, comfortable, and large text sizes plus compact and comfortable data density. Preferences are stored in browser storage and do not move identities, assignments, zones, or event history out of D1.
+
+### Configurable overview — `IMPLEMENTED`
+
+The overview begins as a blank canvas. An operator can independently enable:
+
+```text
+Security summary
+Facility map
+Recent activity
+Needs attention
+On-site roster
+```
+
+Any combination is supported, including no widgets. The choice is device-local and can be changed from the overview action or global settings menu.
+
+### Simplified activity history — `IMPLEMENTED`
+
+The activity page uses a five-field visual model:
+
+```text
+Time  = 24-hour local clock time
+Who   = person or presented credential
+What  = access granted or access denied, plus reason
+Where = controlled zone and reader
+When  = calendar date and relative age
+```
+
+Organization and event ID are intentionally omitted from the visual activity table. Search, decision and location filters, responsive cards, and CSV export follow the same field model. The underlying immutable event record still retains its full relational IDs.
 
 ### Operations interface — `IMPLEMENTED`
 
 ```text
 Overview dashboard
+Blank-canvas widget customization
 Clickable photo-backed summary logs
 Live facility map
 Light/dark theme switcher
+Adjustable text size and layout density
 People and credential directory
 Organization and tenant directory
 Access policy catalog
 Facility hierarchy and zone inspector
 Badge-presentation simulator
 Activity log
+Five-field, 24-hour activity presentation
 Responsive desktop, tablet, and mobile layouts
 ```
 
