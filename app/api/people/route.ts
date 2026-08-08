@@ -72,13 +72,17 @@ export async function POST(request: Request) {
     const id = `person-${crypto.randomUUID()}`;
     // The legacy schema requires a unique reference. It is intentionally not exposed as a badge.
     const badgeNumber = createDirectoryReference();
+    const highestPin = await db
+      .prepare("SELECT COALESCE(MAX(CAST(ibx_access_pin AS INTEGER)), 0) AS value FROM people")
+      .first<{ value: number }>();
+    const ibxAccessPin = String(Number(highestPin?.value ?? 0) + 1).padStart(6, "0");
     const now = new Date().toISOString();
     await db
       .prepare(
         `INSERT INTO people
-          (id, first_name, last_name, email, phone_number, organization_id, relationship_type,
+          (id, first_name, last_name, email, phone_number, ibx_access_pin, organization_id, relationship_type,
            job_function, badge_number, active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       )
       .bind(
         id,
@@ -86,6 +90,7 @@ export async function POST(request: Request) {
         lastName,
         email,
         phoneNumber,
+        ibxAccessPin,
         organizationId,
         relationshipType,
         jobFunction,

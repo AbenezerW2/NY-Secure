@@ -25,6 +25,13 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /aria-label="Search by OID"/);
   assert.doesNotMatch(consoleSource, /records are indexed/);
   assert.doesNotMatch(consoleSource, /onClick=\{onAdd\}/);
+  assert.match(consoleSource, /people-search-button/);
+  assert.match(consoleSource, /type="submit"/);
+  assert.match(consoleSource, /PersonProfileCard/);
+  assert.match(consoleSource, /IBX access PIN/);
+  assert.match(consoleSource, /Access history/);
+  assert.match(consoleSource, /Point of contact/);
+  assert.match(consoleSource, /blank-contact-photo/);
   assert.match(consoleSource, /name="phoneNumber"/);
   assert.match(consoleSource, /Internal employee/);
   assert.match(consoleSource, /Badge access and activity are managed outside this board/);
@@ -51,6 +58,8 @@ test("ships durable access-control capabilities instead of starter artifacts", a
   assert.match(schema, /accessAssignments/);
   assert.match(schema, /accessEvents/);
   assert.match(schema, /phoneNumber:\s*text\("phone_number"\)/);
+  assert.match(schema, /ibxAccessPin:\s*text\("ibx_access_pin"\)/);
+  assert.match(schema, /creditHold:\s*integer\("credit_hold"/);
   assert.match(hosting, /"d1":\s*"DB"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 

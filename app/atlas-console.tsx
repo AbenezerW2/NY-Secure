@@ -18,6 +18,9 @@ type Organization = {
   name: string;
   type: string;
   status: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
 };
 
 type Zone = {
@@ -36,6 +39,8 @@ type Person = {
   lastName: string;
   email: string;
   phoneNumber: string;
+  ibxAccessPin: string;
+  creditHold: boolean;
   organizationId: string;
   organizationName?: string;
   relationshipType: string;
@@ -231,6 +236,9 @@ function normalizeState(source: {
     name: String(item.name),
     type: String(item.type ?? item.organizationType ?? "ORGANIZATION"),
     status: item.active === false ? "INACTIVE" : "ACTIVE",
+    contactName: String(item.contactName ?? "Not provided"),
+    contactPhone: String(item.contactPhone ?? ""),
+    contactEmail: String(item.contactEmail ?? ""),
   }));
   const organizationNames = new Map(organizations.map((organization) => [organization.id, organization.name]));
   const tenantIds = ["org-northstar", "org-lumina", "org-redwood", "org-apex", "org-meridian", "org-brightway", "org-boldyn"];
@@ -273,6 +281,8 @@ function normalizeState(source: {
     lastName: String(item.lastName),
     email: String(item.email),
     phoneNumber: String(item.phoneNumber ?? ""),
+    ibxAccessPin: String(item.ibxAccessPin ?? "000000"),
+    creditHold: item.creditHold === true,
     organizationId: String(item.organizationId),
     organizationName: String(item.organizationName ?? organizationNames.get(String(item.organizationId)) ?? ""),
     relationshipType: String(item.relationshipType ?? "OTHER"),
@@ -691,6 +701,10 @@ export default function AtlasConsole() {
                 <PeopleView
                   people={data.people}
                   orgMap={orgMap}
+                  assignments={data.assignments}
+                  profiles={profileMap}
+                  events={data.events}
+                  zones={zoneMap}
                 />
               )}
               {activeView === "organizations" && (
@@ -1097,29 +1111,47 @@ function Operations({
 function PeopleView({
   people,
   orgMap,
+  assignments,
+  profiles,
+  events,
+  zones,
 }: {
   people: Person[];
   orgMap: Map<string, Organization>;
+  assignments: Assignment[];
+  profiles: Map<string, Profile>;
+  events: AccessEvent[];
+  zones: Map<string, Zone>;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
   const [oid, setOid] = useState("");
-  const hasQuery = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
+  const [submittedSearch, setSubmittedSearch] = useState<{ firstName: string; lastName: string; company: string; oid: string } | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+  const canSearch = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
   const filteredPeople = useMemo(() => {
-    if (!hasQuery) return [];
+    if (!submittedSearch) return [];
     const matches = (value: string, search: string) => value.toLowerCase().includes(search.trim().toLowerCase());
     return people.filter((person) => {
       const organization = orgMap.get(person.organizationId);
       return (
-        (!firstName.trim() || matches(person.firstName, firstName)) &&
-        (!lastName.trim() || matches(person.lastName, lastName)) &&
-        (!company.trim() || matches(person.organizationName || organization?.name || "", company)) &&
-        (!oid.trim() || matches(organization?.oid || person.organizationId, oid))
+        (!submittedSearch.firstName || matches(person.firstName, submittedSearch.firstName)) &&
+        (!submittedSearch.lastName || matches(person.lastName, submittedSearch.lastName)) &&
+        (!submittedSearch.company || matches(person.organizationName || organization?.name || "", submittedSearch.company)) &&
+        (!submittedSearch.oid || matches(organization?.oid || person.organizationId, submittedSearch.oid))
       );
     });
-  }, [company, firstName, hasQuery, lastName, oid, orgMap, people]);
+  }, [orgMap, people, submittedSearch]);
+
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSearch) return;
+    setSubmittedSearch({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), oid: oid.trim() });
+  }
+
   return (
+    <>
     <section className="panel directory-panel people-directory">
       <div className="people-search-header">
         <div>
@@ -1128,18 +1160,72 @@ function PeopleView({
           <p>Search by first name, last name, OID, or company.</p>
         </div>
       </div>
-      <div className="people-search-box">
+      <form className="people-search-box" onSubmit={search}>
         <div className="people-search-grid">
           <label className="people-query"><span>First name</span><input aria-label="Search by first name" placeholder="e.g. Amara" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoFocus /></label>
           <label className="people-query"><span>Last name</span><input aria-label="Search by last name" placeholder="e.g. Okafor" value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
           <label className="people-query"><span>Company name</span><input aria-label="Search by company name" placeholder="e.g. Citadel Securities" value={company} onChange={(event) => setCompany(event.target.value)} /></label>
           <label className="people-query"><span>OID</span><input aria-label="Search by OID" placeholder="e.g. OID-CITADEL-SECURITIES" value={oid} onChange={(event) => setOid(event.target.value)} /></label>
+          <button className="primary-button people-search-button" disabled={!canSearch} type="submit"><span aria-hidden="true">⌕</span> Search</button>
         </div>
-      </div>
-      {!hasQuery && <div className="people-search-empty"><span>⌕</span><h3>Search the people database</h3></div>}
-      {hasQuery && filteredPeople.length > 0 && <><div className="people-results-meta"><strong>{filteredPeople.length} {filteredPeople.length === 1 ? "result" : "results"}</strong><span>All entered parameters must match</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th></tr></thead><tbody>{filteredPeople.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td></tr>; })}</tbody></table></div></>}
-      {hasQuery && filteredPeople.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the entered first name, last name, company, or OID.</p></div>}
+      </form>
+      {!submittedSearch && <div className="people-search-empty"><span>⌕</span><h3>Enter one or more fields, then select Search</h3></div>}
+      {submittedSearch && filteredPeople.length > 0 && <><div className="people-results-meta"><strong>{filteredPeople.length} {filteredPeople.length === 1 ? "result" : "results"}</strong><span>Select View profile for details</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th><th><span className="sr-only">Profile</span></th></tr></thead><tbody>{filteredPeople.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td><td><button className="view-profile-button" onClick={() => setSelectedPerson(person)} type="button">View profile</button></td></tr>; })}</tbody></table></div></>}
+      {submittedSearch && filteredPeople.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the entered first name, last name, company, or OID.</p></div>}
     </section>
+    {selectedPerson && <PersonProfileCard person={selectedPerson} organization={orgMap.get(selectedPerson.organizationId)} assignments={assignments.filter((assignment) => assignment.personId === selectedPerson.id && assignment.status === "ACTIVE")} profiles={profiles} events={events.filter((event) => event.personId === selectedPerson.id)} zones={zones} onClose={() => setSelectedPerson(null)} />}
+    </>
+  );
+}
+
+function PersonProfileCard({
+  person,
+  organization,
+  assignments,
+  profiles,
+  events,
+  zones,
+  onClose,
+}: {
+  person: Person;
+  organization?: Organization;
+  assignments: Assignment[];
+  profiles: Map<string, Profile>;
+  events: AccessEvent[];
+  zones: Map<string, Zone>;
+  onClose: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"access" | "history" | "contact">("access");
+  const cageIds = Array.from(new Set(assignments.flatMap((assignment) => profiles.get(assignment.profileId)?.zones ?? []).filter((zoneId) => zones.get(zoneId)?.type === "CAGE" || zoneId.startsWith("zone-cage-"))));
+  return (
+    <div className="modal-backdrop profile-card-backdrop" onMouseDown={onClose}>
+      <article className="person-profile-card" role="dialog" aria-modal="true" aria-label={`${person.firstName} ${person.lastName} profile`} onMouseDown={(event) => event.stopPropagation()}>
+        <button className="close-button profile-close" onClick={onClose} type="button" aria-label="Close profile">×</button>
+        <aside className="profile-identity">
+          <span className="blank-contact-photo" aria-label="No profile photo"><i /><b /></span>
+          <h2>{person.firstName} {person.lastName}</h2>
+          <span className="profile-record-type">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span>
+          <dl>
+            <div><dt>IBX access PIN</dt><dd><code>{person.ibxAccessPin}</code></dd></div>
+            <div><dt>OID</dt><dd><code>{organization?.oid ?? person.organizationId}</code></dd></div>
+            <div><dt>Company</dt><dd>{organization?.name ?? person.organizationName}</dd></div>
+            <div><dt>Credit hold</dt><dd><span className={`credit-hold ${person.creditHold ? "on-hold" : "clear"}`}><i />{person.creditHold ? "On hold" : "No hold"}</span></dd></div>
+          </dl>
+        </aside>
+        <section className="profile-details">
+          <nav className="profile-tabs" aria-label="Profile sections">
+            <button className={activeTab === "access" ? "active" : ""} onClick={() => setActiveTab("access")} type="button">Access</button>
+            <button className={activeTab === "history" ? "active" : ""} onClick={() => setActiveTab("history")} type="button">Access history</button>
+            <button className={activeTab === "contact" ? "active" : ""} onClick={() => setActiveTab("contact")} type="button">Contact</button>
+          </nav>
+          <div className="profile-tab-content">
+            {activeTab === "access" && <div className="profile-access"><div className="profile-tab-heading"><p className="eyebrow">Current authorization</p><h3>Cages and cabinets</h3></div>{cageIds.length > 0 ? <div className="cage-access-list">{cageIds.map((zoneId) => { const cage = zones.get(zoneId); const number = cage?.name.match(/\d+/)?.[0] ?? zoneId.replace("zone-cage-", ""); return <article key={zoneId}><span className="cage-access-icon">▦</span><div><strong>{cage?.name ?? `Cage ${number}`}</strong><small>Cabinets</small><p><code>CAB-{number}-01</code><code>CAB-{number}-02</code></p></div></article>; })}</div> : <div className="profile-empty"><span>⊘</span><strong>No cage or cabinet assignments</strong><p>This person has no active customer-space authorization.</p></div>}</div>}
+            {activeTab === "history" && <div className="profile-history"><div className="profile-tab-heading"><p className="eyebrow">Previous activity</p><h3>Access history</h3></div>{events.length > 0 ? <div className="profile-history-list">{events.map((event) => <article key={event.id}><span className={`history-mark ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"}</span><div><strong>{event.zoneName ?? event.zoneId}</strong><small>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</small></div><time><b>{formatDate(event.occurredAt)}</b><small>{formatTime(event.occurredAt)}</small></time></article>)}</div> : <div className="profile-empty"><span>⌁</span><strong>No previous sign-ins</strong><p>Access activity will appear here after the first recorded event.</p></div>}</div>}
+            {activeTab === "contact" && <div className="profile-contact"><div className="profile-tab-heading"><p className="eyebrow">Directory details</p><h3>Contact</h3></div><dl><div><dt>Company</dt><dd>{organization?.name ?? person.organizationName}</dd></div><div><dt>Point of contact</dt><dd>{organization?.contactName || "Not provided"}</dd></div><div><dt>Point-of-contact phone</dt><dd>{organization?.contactPhone ? <a href={`tel:${organization.contactPhone}`}>{organization.contactPhone}</a> : "Not provided"}</dd></div><div><dt>Person’s phone</dt><dd>{person.phoneNumber ? <a href={`tel:${person.phoneNumber}`}>{person.phoneNumber}</a> : "Not provided"}</dd></div><div><dt>Work email</dt><dd><a href={`mailto:${person.email}`}>{person.email}</a></dd></div></dl></div>}
+          </div>
+        </section>
+      </article>
+    </div>
   );
 }
 

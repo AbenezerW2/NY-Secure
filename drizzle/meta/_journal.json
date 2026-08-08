@@ -15,6 +15,13 @@
       "when": 1786198136629,
       "tag": "0001_special_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786200383535,
+      "tag": "0002_first_jazinda",
+      "breakpoints": true
     }
   ]
 }

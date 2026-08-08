@@ -212,6 +212,8 @@ export type PersonRow = {
   lastName: string;
   email: string;
   phoneNumber: string;
+  ibxAccessPin: string;
+  creditHold: number | boolean;
   organizationId: string;
   organizationName: string;
   organizationType: string;
@@ -224,7 +226,7 @@ export type PersonRow = {
 };
 
 export function mapPerson(row: PersonRow) {
-  return { ...row, active: asBoolean(row.active), activeAssignments: [] };
+  return { ...row, active: asBoolean(row.active), creditHold: asBoolean(row.creditHold), activeAssignments: [] };
 }
 
 export async function getPerson(db: D1Database, personId: string) {
@@ -236,6 +238,8 @@ export async function getPerson(db: D1Database, personId: string) {
         p.last_name AS lastName,
         p.email,
         p.phone_number AS phoneNumber,
+        p.ibx_access_pin AS ibxAccessPin,
+        p.credit_hold AS creditHold,
         p.organization_id AS organizationId,
         o.name AS organizationName,
         o.organization_type AS organizationType,

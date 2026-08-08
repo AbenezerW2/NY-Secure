@@ -15,6 +15,8 @@ export const organizations = sqliteTable(
     name: text("name").notNull(),
     organizationType: text("organization_type").notNull(),
     contactEmail: text("contact_email"),
+    contactName: text("contact_name").notNull().default(""),
+    contactPhone: text("contact_phone").notNull().default(""),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -51,6 +53,8 @@ export const people = sqliteTable(
     lastName: text("last_name").notNull(),
     email: text("email").notNull(),
     phoneNumber: text("phone_number").notNull().default(""),
+    ibxAccessPin: text("ibx_access_pin").notNull().default(""),
+    creditHold: integer("credit_hold", { mode: "boolean" }).notNull().default(false),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id),
