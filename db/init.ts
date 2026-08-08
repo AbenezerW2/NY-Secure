@@ -6,6 +6,8 @@ type OrganizationSeed = {
   name: string;
   type: string;
   contactEmail: string;
+  contactName: string;
+  contactPhone: string;
 };
 
 type ZoneSeed = {
@@ -25,6 +27,7 @@ type PersonSeed = {
   lastName: string;
   email: string;
   phoneNumber: string;
+  ibxAccessPin: string;
   organizationId: string;
   relationshipType: string;
   jobFunction: string;
@@ -47,6 +50,8 @@ const organizations: OrganizationSeed[] = [
     name: "NY-Secure",
     type: "DATA_CENTER_OPERATOR",
     contactEmail: "security@ny-secure.example",
+    contactName: "Maya Brooks",
+    contactPhone: "+1 212 555 0200",
   },
   {
     id: "org-northstar",
@@ -54,6 +59,8 @@ const organizations: OrganizationSeed[] = [
     name: "Citadel Securities",
     type: "COLOCATION_CUSTOMER",
     contactEmail: "facilities@citadel-securities.example",
+    contactName: "Jordan Lee",
+    contactPhone: "+1 212 555 0201",
   },
   {
     id: "org-lumina",
@@ -61,6 +68,8 @@ const organizations: OrganizationSeed[] = [
     name: "Two Sigma",
     type: "COLOCATION_CUSTOMER",
     contactEmail: "infrastructure@two-sigma.example",
+    contactName: "Priya Shah",
+    contactPhone: "+1 212 555 0202",
   },
   {
     id: "org-redwood",
@@ -68,6 +77,8 @@ const organizations: OrganizationSeed[] = [
     name: "Hudson River Trading",
     type: "COLOCATION_CUSTOMER",
     contactEmail: "datacenter@hudson-river-trading.example",
+    contactName: "Daniel Kim",
+    contactPhone: "+1 212 555 0203",
   },
   {
     id: "org-apex",
@@ -75,6 +86,8 @@ const organizations: OrganizationSeed[] = [
     name: "Jane Street",
     type: "COLOCATION_CUSTOMER",
     contactEmail: "facilities@jane-street.example",
+    contactName: "Morgan Chen",
+    contactPhone: "+1 212 555 0204",
   },
   {
     id: "org-meridian",
@@ -82,6 +95,8 @@ const organizations: OrganizationSeed[] = [
     name: "Lumen Technologies",
     type: "NETWORK_PROVIDER",
     contactEmail: "field-service@lumen.example",
+    contactName: "Alex Rivera",
+    contactPhone: "+1 212 555 0205",
   },
   {
     id: "org-brightway",
@@ -89,6 +104,8 @@ const organizations: OrganizationSeed[] = [
     name: "Zayo",
     type: "NETWORK_PROVIDER",
     contactEmail: "operations@zayo.example",
+    contactName: "Taylor Morgan",
+    contactPhone: "+1 212 555 0206",
   },
   {
     id: "org-boldyn",
@@ -96,6 +113,8 @@ const organizations: OrganizationSeed[] = [
     name: "Boldyn Networks",
     type: "NETWORK_PROVIDER",
     contactEmail: "operations@boldyn.example",
+    contactName: "Casey Williams",
+    contactPhone: "+1 212 555 0207",
   },
 ];
 
@@ -399,6 +418,7 @@ const people: PersonSeed[] = [
     lastName: "Okafor",
     email: "amara.okafor@ny-secure.example",
     phoneNumber: "+1 212 555 0101",
+    ibxAccessPin: "000001",
     organizationId: "org-atlas",
     relationshipType: "ENGINEER",
     jobFunction: "Critical Facilities Engineer",
@@ -410,6 +430,7 @@ const people: PersonSeed[] = [
     lastName: "Mercer",
     email: "eli.mercer@citadel-securities.example",
     phoneNumber: "+1 212 555 0102",
+    ibxAccessPin: "000002",
     organizationId: "org-northstar",
     relationshipType: "CUSTOMER",
     jobFunction: "Infrastructure Lead",
@@ -421,6 +442,7 @@ const people: PersonSeed[] = [
     lastName: "Reyes",
     email: "sofia.reyes@jane-street.example",
     phoneNumber: "+1 212 555 0103",
+    ibxAccessPin: "000003",
     organizationId: "org-apex",
     relationshipType: "CONTRACTOR",
     jobFunction: "HVAC Technician",
@@ -432,6 +454,7 @@ const people: PersonSeed[] = [
     lastName: "Patel",
     email: "noah.patel@lumen.example",
     phoneNumber: "+1 212 555 0104",
+    ibxAccessPin: "000004",
     organizationId: "org-meridian",
     relationshipType: "VENDOR",
     jobFunction: "Field Service Representative",
@@ -443,6 +466,7 @@ const people: PersonSeed[] = [
     lastName: "Park",
     email: "lena.park@citadel-securities.example",
     phoneNumber: "+1 212 555 0105",
+    ibxAccessPin: "000005",
     organizationId: "org-northstar",
     relationshipType: "VISITOR",
     jobFunction: "Audit Visitor",
@@ -454,6 +478,7 @@ const people: PersonSeed[] = [
     lastName: "Johnson",
     email: "caleb.johnson@zayo.example",
     phoneNumber: "+1 212 555 0106",
+    ibxAccessPin: "000006",
     organizationId: "org-brightway",
     relationshipType: "JANITOR",
     jobFunction: "Custodial Technician",
@@ -477,6 +502,8 @@ const schemaStatements = [
     name TEXT NOT NULL,
     organization_type TEXT NOT NULL,
     contact_email TEXT,
+    contact_name TEXT NOT NULL DEFAULT '',
+    contact_phone TEXT NOT NULL DEFAULT '',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -500,6 +527,8 @@ const schemaStatements = [
     last_name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     phone_number TEXT NOT NULL DEFAULT '',
+    ibx_access_pin TEXT NOT NULL DEFAULT '',
+    credit_hold INTEGER NOT NULL DEFAULT 0 CHECK (credit_hold IN (0, 1)),
     organization_id TEXT NOT NULL REFERENCES organizations(id),
     relationship_type TEXT NOT NULL CHECK (relationship_type IN ('CUSTOMER', 'CONTRACTOR', 'ENGINEER', 'VENDOR', 'VISITOR', 'JANITOR')),
     job_function TEXT NOT NULL,
@@ -589,12 +618,14 @@ async function seedDatabase(db: D1Database) {
       db
         .prepare(
           `INSERT INTO organizations
-            (id, slug, name, organization_type, contact_email)
-           VALUES (?, ?, ?, ?, ?)
+            (id, slug, name, organization_type, contact_email, contact_name, contact_phone)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              slug = excluded.slug, name = excluded.name,
              organization_type = excluded.organization_type,
              contact_email = excluded.contact_email,
+             contact_name = excluded.contact_name,
+             contact_phone = excluded.contact_phone,
              updated_at = CURRENT_TIMESTAMP`,
         )
         .bind(
@@ -603,6 +634,8 @@ async function seedDatabase(db: D1Database) {
           organization.name,
           organization.type,
           organization.contactEmail,
+          organization.contactName,
+          organization.contactPhone,
         ),
     ),
   );
@@ -692,11 +725,12 @@ async function seedDatabase(db: D1Database) {
       db
         .prepare(
           `INSERT INTO people
-            (id, first_name, last_name, email, phone_number, organization_id, relationship_type, job_function, badge_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, first_name, last_name, email, phone_number, ibx_access_pin, organization_id, relationship_type, job_function, badge_number)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              first_name = excluded.first_name, last_name = excluded.last_name,
              email = excluded.email, phone_number = excluded.phone_number,
+             ibx_access_pin = excluded.ibx_access_pin,
              organization_id = excluded.organization_id,
              relationship_type = excluded.relationship_type,
              job_function = excluded.job_function, badge_number = excluded.badge_number,
@@ -708,6 +742,7 @@ async function seedDatabase(db: D1Database) {
           person.lastName,
           person.email,
           person.phoneNumber,
+          person.ibxAccessPin,
           person.organizationId,
           person.relationshipType,
           person.jobFunction,
@@ -843,7 +878,28 @@ export async function ensureDatabase() {
       if (!peopleColumns.results.some((column) => column.name === "phone_number")) {
         await db.prepare("ALTER TABLE people ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''").run();
       }
+      if (!peopleColumns.results.some((column) => column.name === "ibx_access_pin")) {
+        await db.prepare("ALTER TABLE people ADD COLUMN ibx_access_pin TEXT NOT NULL DEFAULT ''").run();
+      }
+      if (!peopleColumns.results.some((column) => column.name === "credit_hold")) {
+        await db.prepare("ALTER TABLE people ADD COLUMN credit_hold INTEGER NOT NULL DEFAULT 0 CHECK (credit_hold IN (0, 1))").run();
+      }
+      const organizationColumns = await db.prepare("PRAGMA table_info(organizations)").all<{ name: string }>();
+      if (!organizationColumns.results.some((column) => column.name === "contact_name")) {
+        await db.prepare("ALTER TABLE organizations ADD COLUMN contact_name TEXT NOT NULL DEFAULT ''").run();
+      }
+      if (!organizationColumns.results.some((column) => column.name === "contact_phone")) {
+        await db.prepare("ALTER TABLE organizations ADD COLUMN contact_phone TEXT NOT NULL DEFAULT ''").run();
+      }
       await seedDatabase(db);
+      const missingPins = await db.prepare("SELECT id FROM people WHERE ibx_access_pin = '' ORDER BY created_at, id").all<{ id: string }>();
+      const maxPin = await db.prepare("SELECT COALESCE(MAX(CAST(ibx_access_pin AS INTEGER)), 0) AS value FROM people").first<{ value: number }>();
+      if (missingPins.results.length > 0) {
+        await db.batch(missingPins.results.map((person, index) =>
+          db.prepare("UPDATE people SET ibx_access_pin = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(String(Number(maxPin?.value ?? 0) + index + 1).padStart(6, "0"), person.id),
+        ));
+      }
     })().catch((error) => {
       initializationPromise = undefined;
       throw error;

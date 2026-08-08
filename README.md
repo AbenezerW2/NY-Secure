@@ -61,7 +61,15 @@ Search, decision filtering, location filtering, responsive mobile cards, and CSV
 
 ## People directory
 
-The People tab is a search database rather than a roster. First name, last name, company name, and OID are independent search parameters; when more than one is entered, every populated field must match. The tab shows no person rows until an operator searches. Matching results contain identity and contact fields only: first name, last name, OID, company, phone, work email, and record type. Badge identifiers, effective access, and activity logs are intentionally absent from this tab. The single Add person action remains in the page header rather than being duplicated inside the search panel.
+The People tab is a search database rather than a roster. First name, last name, company name, and OID are independent search parameters; when more than one is entered, every populated field must match. Typing does not reveal records—the operator must select **Search**. Matching results contain identity and contact fields only, and the single Add person action remains in the page header.
+
+Each result can open a profile card with a blank contact-photo placeholder. The identity summary shows the person’s name, six-digit IBX access PIN, OID, company, and credit-hold state. PINs start at `000001` for the seeded directory and increment for each new person. The profile includes three tabs:
+
+- **Access** — active cage assignments and their simulated cabinet identifiers.
+- **Access history** — previous grants and denials with location, date, and 24-hour time.
+- **Contact** — company, organizational point of contact and phone, the person’s phone, and work email.
+
+Stock profile imagery is intentionally not used. Credit-hold state is durable D1 data and defaults to no hold; a future billing workflow can manage it.
 
 The current OID is a stable, human-readable identifier derived from the organization slug (for example, `OID-CITADEL-SECURITIES`). This is an interim directory key; the organization-management phase can replace it with a dedicated OID model without changing the search experience.
 

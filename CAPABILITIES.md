@@ -94,6 +94,17 @@ record_type
 
 Each search key has its own input. Populated parameters are combined with AND matching, while blank parameters are ignored. The page header is the only location for the Add person action, and the empty state does not reveal a directory record count.
 
+Search execution is explicit: field edits remain drafts until the operator selects Search or presses Enter. A result opens a profile card with a blank contact-photo placeholder and durable identity metadata:
+
+```text
+IBX access PIN = six digits, sequential from 000001
+OID
+company
+credit_hold = true | false
+```
+
+Profile tabs expose current cage/cabinet assignments derived from active access profiles, previous access-event dates and decisions, and person/company contact details. Organization point-of-contact name and phone are stored with the organization. New identities default to no credit hold.
+
 OID currently uses a stable human-readable value derived from the organization slug, such as `OID-CITADEL-SECURITIES`. A dedicated OID data model is reserved for the later organization-management phase.
 
 Identity and authorization are deliberately separate:

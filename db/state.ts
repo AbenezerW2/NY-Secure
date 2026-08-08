@@ -12,6 +12,8 @@ type OrganizationRow = {
   name: string;
   type: string;
   contactEmail: string | null;
+  contactName: string;
+  contactPhone: string;
   active: number | boolean;
   createdAt: string;
   updatedAt: string;
@@ -89,7 +91,8 @@ export async function getState(db: D1Database) {
       .prepare(
         `SELECT
           id, slug, name, organization_type AS type,
-          contact_email AS contactEmail, active,
+          contact_email AS contactEmail, contact_name AS contactName,
+          contact_phone AS contactPhone, active,
           created_at AS createdAt, updated_at AS updatedAt
          FROM organizations
          ORDER BY name`,
@@ -111,6 +114,7 @@ export async function getState(db: D1Database) {
         `SELECT
           p.id, p.first_name AS firstName, p.last_name AS lastName,
           p.email, p.phone_number AS phoneNumber,
+          p.ibx_access_pin AS ibxAccessPin, p.credit_hold AS creditHold,
           p.organization_id AS organizationId,
           o.name AS organizationName, o.organization_type AS organizationType,
           p.relationship_type AS relationshipType,
@@ -221,6 +225,7 @@ export async function getState(db: D1Database) {
   const people = peopleResult.results.map((person) => ({
     ...person,
     active: asBoolean(person.active),
+    creditHold: asBoolean(person.creditHold),
     activeAssignments: assignmentsByPerson.get(person.id) ?? [],
   }));
   const profiles = profileResult.results.map((profile) => {
