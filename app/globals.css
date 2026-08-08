@@ -933,6 +933,27 @@ select:focus-visible {
 .identity-results td > a:hover { text-decoration: underline; }
 .view-profile-button { min-height: 31px; padding: 0 10px; color: #2768c8; background: #edf4ff; border: 1px solid #cfe0f8; border-radius: 6px; cursor: pointer; font-size: calc(7px * var(--font-scale)); font-weight: 700; white-space: nowrap; }
 .people-no-results { margin: 55px auto; }
+.contact-results-panel { min-height: clamp(460px, 58vh, 720px); overflow: hidden; }
+.contact-results-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 26px; border-bottom: 1px solid #e2e9ed; }
+.contact-results-panel > header h2 { margin: 4px 0 0; color: #263f45; font-size: calc(18px * var(--font-scale)); }
+.contact-results-panel > header p:last-child { margin: 6px 0 0; color: #7d8e94; font-size: calc(8px * var(--font-scale)); }
+.contact-card-grid { display: grid; grid-template-columns: repeat(3, minmax(230px, 1fr)); gap: 15px; padding: 26px; }
+.person-contact-card { min-width: 0; padding: 0; overflow: hidden; color: inherit; background: #fff; border: 1px solid #d5e0e7; border-radius: 12px; box-shadow: 0 4px 14px rgba(28, 57, 79, .06); cursor: pointer; text-align: left; transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease; }
+.person-contact-card:hover { transform: translateY(-2px); border-color: #7aa9e8; box-shadow: 0 9px 24px rgba(28, 76, 127, .12); }
+.person-contact-card:focus-visible { outline: 3px solid rgba(45, 112, 223, .24); outline-offset: 2px; }
+.contact-card-type { display: block; padding: 9px 14px 8px; border-bottom: 1px solid #e5ebef; font-size: calc(7px * var(--font-scale)); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.contact-card-type.customer { color: #2768c8; background: #eef5ff; }
+.contact-card-type.internal { color: #167b5b; background: #ebf7f2; }
+.contact-card-body { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 16px 14px; }
+.contact-card-photo { position: relative; display: block; width: 46px; height: 46px; overflow: hidden; background: #dce7f1; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #cbd9e3; }
+.contact-card-photo i { position: absolute; top: 9px; left: 50%; width: 14px; height: 14px; transform: translateX(-50%); background: #8fa6b8; border-radius: 50%; }
+.contact-card-photo b { position: absolute; bottom: 5px; left: 50%; width: 28px; height: 17px; transform: translateX(-50%); background: #8fa6b8; border-radius: 18px 18px 6px 6px; }
+.contact-card-name { min-width: 0; }
+.contact-card-name strong, .contact-card-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contact-card-name strong { color: #2e4952; font-size: calc(10px * var(--font-scale)); }
+.contact-card-name small { margin-top: 5px; color: #809096; font-size: calc(8px * var(--font-scale)); }
+.contact-card-menu { color: #3379d9; font-size: calc(17px * var(--font-scale)); letter-spacing: -4px; }
+.contact-results-empty { margin: 70px auto; }
 
 .person-profile-card { position: relative; display: grid; width: 100%; min-height: clamp(500px, 62vh, 760px); grid-template-columns: 290px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #d9e3e8; border-radius: 12px; }
 .profile-identity { padding: 36px 27px; background: #f5f8fc; border-right: 1px solid #e0e7ec; }
@@ -1559,6 +1580,12 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .people-workspace-tabs { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button, .people-tab-shell) { color: #8fa2b9; background: #132238; border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button.active, .people-tab-shell.active) { color: #a9c8ff; background: var(--surface); }
+.app-shell[data-theme="dark"] .contact-results-panel > header { border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.contact-results-panel > header h2, .contact-card-name strong) { color: var(--ink); }
+.app-shell[data-theme="dark"] .person-contact-card { background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] .contact-card-type { border-color: var(--line); }
+.app-shell[data-theme="dark"] .contact-card-type.customer { color: #a9c8ff; background: #17345f; }
+.app-shell[data-theme="dark"] .contact-card-type.internal { color: #8ed6bd; background: #11362e; }
 .app-shell[data-theme="dark"] .data-table tbody tr:focus-within { background: #1a2d48; }
 .app-shell[data-theme="dark"] .tree-branch button:hover,
 .app-shell[data-theme="dark"] .tree-branch button.active { color: #a9c8ff; background: #17345f; }
@@ -1596,6 +1623,7 @@ select:focus-visible {
   .event-what { display: none; }
   .people-search-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .people-search-button { grid-column: 1 / -1; justify-self: end; }
+  .contact-card-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -1624,6 +1652,8 @@ select:focus-visible {
   .people-search-box { padding: 0 17px 17px; }
   .people-search-grid { grid-template-columns: 1fr; }
   .people-search-button { grid-column: 1; width: 100%; }
+  .contact-results-panel > header { align-items: flex-start; flex-direction: column; padding: 19px 17px; }
+  .contact-card-grid { grid-template-columns: 1fr; padding: 17px; }
   .people-results-meta { align-items: flex-start; flex-direction: column; padding-inline: 17px; }
   .identity-results { min-width: 0; }
   .identity-results thead { display: none; }
