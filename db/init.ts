@@ -52,42 +52,42 @@ const organizations: OrganizationSeed[] = [
     slug: "citadel-securities",
     name: "Citadel Securities",
     type: "COLOCATION_CUSTOMER",
-    contactEmail: "facilities@northstar.example",
+    contactEmail: "facilities@citadel-securities.example",
   },
   {
     id: "org-lumina",
     slug: "two-sigma",
     name: "Two Sigma",
     type: "COLOCATION_CUSTOMER",
-    contactEmail: "infrastructure@lumina.example",
+    contactEmail: "infrastructure@two-sigma.example",
   },
   {
     id: "org-redwood",
     slug: "hudson-river-trading",
     name: "Hudson River Trading",
     type: "COLOCATION_CUSTOMER",
-    contactEmail: "datacenter@redwood-biotech.example",
+    contactEmail: "datacenter@hudson-river-trading.example",
   },
   {
     id: "org-apex",
     slug: "jane-street",
     name: "Jane Street",
     type: "COLOCATION_CUSTOMER",
-    contactEmail: "dispatch@apex-mechanical.example",
+    contactEmail: "facilities@jane-street.example",
   },
   {
     id: "org-meridian",
     slug: "lumen-technologies",
     name: "Lumen Technologies",
     type: "NETWORK_PROVIDER",
-    contactEmail: "field-service@meridian-power.example",
+    contactEmail: "field-service@lumen.example",
   },
   {
     id: "org-brightway",
     slug: "zayo",
     name: "Zayo",
     type: "NETWORK_PROVIDER",
-    contactEmail: "operations@brightway.example",
+    contactEmail: "operations@zayo.example",
   },
   {
     id: "org-boldyn",
@@ -406,7 +406,7 @@ const people: PersonSeed[] = [
     id: "person-eli-mercer",
     firstName: "Eli",
     lastName: "Mercer",
-    email: "eli.mercer@northstar.example",
+    email: "eli.mercer@citadel-securities.example",
     organizationId: "org-northstar",
     relationshipType: "CUSTOMER",
     jobFunction: "Infrastructure Lead",
@@ -416,7 +416,7 @@ const people: PersonSeed[] = [
     id: "person-sofia-reyes",
     firstName: "Sofia",
     lastName: "Reyes",
-    email: "sofia.reyes@apex-mechanical.example",
+    email: "sofia.reyes@jane-street.example",
     organizationId: "org-apex",
     relationshipType: "CONTRACTOR",
     jobFunction: "HVAC Technician",
@@ -426,7 +426,7 @@ const people: PersonSeed[] = [
     id: "person-noah-patel",
     firstName: "Noah",
     lastName: "Patel",
-    email: "noah.patel@meridian-power.example",
+    email: "noah.patel@lumen.example",
     organizationId: "org-meridian",
     relationshipType: "VENDOR",
     jobFunction: "Field Service Representative",
@@ -436,7 +436,7 @@ const people: PersonSeed[] = [
     id: "person-lena-park",
     firstName: "Lena",
     lastName: "Park",
-    email: "lena.park@northstar.example",
+    email: "lena.park@citadel-securities.example",
     organizationId: "org-northstar",
     relationshipType: "VISITOR",
     jobFunction: "Audit Visitor",
@@ -446,7 +446,7 @@ const people: PersonSeed[] = [
     id: "person-caleb-johnson",
     firstName: "Caleb",
     lastName: "Johnson",
-    email: "caleb.johnson@brightway.example",
+    email: "caleb.johnson@zayo.example",
     organizationId: "org-brightway",
     relationshipType: "JANITOR",
     jobFunction: "Custodial Technician",
@@ -626,6 +626,16 @@ async function seedDatabase(db: D1Database) {
     ),
   );
 
+  await db.batch([
+    db.prepare("UPDATE access_events SET zone_id = 'zone-cage-11000' WHERE zone_id = 'zone-cage-111'"),
+    db.prepare("UPDATE access_events SET zone_id = 'zone-cage-11010' WHERE zone_id = 'zone-cage-112'"),
+    db.prepare("UPDATE access_events SET zone_id = 'zone-cage-22000' WHERE zone_id = 'zone-cage-113'"),
+    db.prepare("UPDATE access_events SET zone_id = 'zone-cage-22010' WHERE zone_id = 'zone-cage-114'"),
+    db.prepare("UPDATE access_events SET zone_id = 'zone-entrance-mantrap' WHERE zone_id = 'zone-mantrap'"),
+    db.prepare("DELETE FROM profile_zone_rules WHERE zone_id IN ('zone-cage-111', 'zone-cage-112', 'zone-cage-113', 'zone-cage-114', 'zone-mantrap')"),
+    db.prepare("DELETE FROM zones WHERE id IN ('zone-cage-111', 'zone-cage-112', 'zone-cage-113', 'zone-cage-114', 'zone-mantrap')"),
+  ]);
+
   await db.batch(
     profiles.map((profile) =>
       db
@@ -673,9 +683,15 @@ async function seedDatabase(db: D1Database) {
     people.map((person) =>
       db
         .prepare(
-          `INSERT OR IGNORE INTO people
+          `INSERT INTO people
             (id, first_name, last_name, email, organization_id, relationship_type, job_function, badge_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             first_name = excluded.first_name, last_name = excluded.last_name,
+             email = excluded.email, organization_id = excluded.organization_id,
+             relationship_type = excluded.relationship_type,
+             job_function = excluded.job_function, badge_number = excluded.badge_number,
+             updated_at = CURRENT_TIMESTAMP`,
         )
         .bind(
           person.id,
@@ -782,9 +798,14 @@ async function seedDatabase(db: D1Database) {
     seededEvents.map((event) =>
       db
         .prepare(
-          `INSERT OR IGNORE INTO access_events
+          `INSERT INTO access_events
             (id, person_id, zone_id, assignment_id, profile_id, decision, reason_code, explanation, attempted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             person_id = excluded.person_id, zone_id = excluded.zone_id,
+             assignment_id = excluded.assignment_id, profile_id = excluded.profile_id,
+             decision = excluded.decision, reason_code = excluded.reason_code,
+             explanation = excluded.explanation`,
         )
         .bind(
           event.id,

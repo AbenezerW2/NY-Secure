@@ -93,6 +93,17 @@ type StatePayload = {
 
 type Flash = { tone: "success" | "danger" | "info"; message: string } | null;
 type StatTab = "people" | "credentials" | "grants" | "denials";
+type DashboardWidget = "stats" | "facility" | "activity" | "attention" | "roster";
+type FontSizePreference = "small" | "comfortable" | "large";
+type DensityPreference = "compact" | "comfortable";
+
+const DASHBOARD_WIDGETS: { id: DashboardWidget; label: string; description: string }[] = [
+  { id: "stats", label: "Security summary", description: "People, credentials, grants, and denials" },
+  { id: "facility", label: "Facility map", description: "Interactive floor plan and selected zone" },
+  { id: "activity", label: "Recent activity", description: "Latest simplified access decisions" },
+  { id: "attention", label: "Needs attention", description: "Expirations and open security tasks" },
+  { id: "roster", label: "On-site roster", description: "Currently active people and access" },
+];
 
 const NAV_ITEMS: { id: View; label: string; symbol: string }[] = [
   { id: "overview", label: "Overview", symbol: "OV" },
@@ -175,9 +186,10 @@ function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    hour12: false,
   }).format(date);
 }
 
@@ -342,6 +354,10 @@ export default function AtlasConsole() {
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [simulationZoneId, setSimulationZoneId] = useState("zone-cage-11000");
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [fontSize, setFontSize] = useState<FontSizePreference>("comfortable");
+  const [density, setDensity] = useState<DensityPreference>("comfortable");
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
   const [activeStatTab, setActiveStatTab] = useState<StatTab | null>(null);
   const [simulationResult, setSimulationResult] = useState<{
     decision: "GRANTED" | "DENIED";
@@ -384,6 +400,19 @@ export default function AtlasConsole() {
     const timer = window.setTimeout(() => {
       const savedTheme = window.localStorage.getItem("ny-secure-theme");
       if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
+      const savedFontSize = window.localStorage.getItem("ny-secure-font-size");
+      if (savedFontSize === "small" || savedFontSize === "comfortable" || savedFontSize === "large") setFontSize(savedFontSize);
+      const savedDensity = window.localStorage.getItem("ny-secure-density");
+      if (savedDensity === "compact" || savedDensity === "comfortable") setDensity(savedDensity);
+      const savedWidgets = window.localStorage.getItem("ny-secure-dashboard-widgets");
+      if (savedWidgets) {
+        try {
+          const parsed = JSON.parse(savedWidgets) as DashboardWidget[];
+          setDashboardWidgets(parsed.filter((item) => DASHBOARD_WIDGETS.some((widget) => widget.id === item)));
+        } catch {
+          setDashboardWidgets([]);
+        }
+      }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -394,6 +423,21 @@ export default function AtlasConsole() {
       window.localStorage.setItem("ny-secure-theme", next);
       return next;
     });
+  }
+
+  function updateFontSize(value: FontSizePreference) {
+    setFontSize(value);
+    window.localStorage.setItem("ny-secure-font-size", value);
+  }
+
+  function updateDensity(value: DensityPreference) {
+    setDensity(value);
+    window.localStorage.setItem("ny-secure-density", value);
+  }
+
+  function updateDashboardWidgets(value: DashboardWidget[]) {
+    setDashboardWidgets(value);
+    window.localStorage.setItem("ny-secure-dashboard-widgets", JSON.stringify(value));
   }
 
   useEffect(() => {
@@ -506,7 +550,7 @@ export default function AtlasConsole() {
   const viewCopy = VIEW_COPY[activeView];
 
   return (
-    <main className="app-shell" data-theme={theme}>
+    <main className="app-shell" data-theme={theme} data-font-size={fontSize} data-density={density}>
       <aside className="sidebar">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
@@ -591,11 +635,14 @@ export default function AtlasConsole() {
           </label>
           <div className="topbar-time">
             <small>America / New York</small>
-            <strong>{clock.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })}</strong>
+            <strong>{clock.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</strong>
           </div>
           <button className="theme-toggle" onClick={toggleTheme} type="button" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
             <span aria-hidden="true">{theme === "light" ? "☾" : "☀"}</span>
             {theme === "light" ? "Dark" : "Light"}
+          </button>
+          <button className="icon-button settings-button" onClick={() => setShowSettings(true)} type="button" aria-label="Open display and dashboard settings">
+            <span aria-hidden="true">⚙</span>
           </button>
           <button className="icon-button" type="button" aria-label="Notifications">
             <span>○</span><i />
@@ -610,6 +657,11 @@ export default function AtlasConsole() {
               <p>{viewCopy.subtitle}</p>
             </div>
             <div className="page-actions">
+              {activeView === "overview" && (
+                <button className="secondary-button" onClick={() => setShowSettings(true)} type="button">
+                  <span>＋</span> Customize overview
+                </button>
+              )}
               {activeView === "people" && (
                 <button className="primary-button" onClick={() => setShowAddPerson(true)} type="button">
                   <span>＋</span> Add person
@@ -639,6 +691,8 @@ export default function AtlasConsole() {
                   activeAssignmentsFor={activeAssignmentsFor}
                   onViewAll={() => setActiveView("activity")}
                   onOpenStat={setActiveStatTab}
+                  enabledWidgets={dashboardWidgets}
+                  onCustomize={() => setShowSettings(true)}
                 />
               )}
               {activeView === "operations" && (
@@ -732,6 +786,19 @@ export default function AtlasConsole() {
       {activeStatTab && data && (
         <StatLogDrawer tab={activeStatTab} data={data} onClose={() => setActiveStatTab(null)} />
       )}
+      {showSettings && (
+        <SettingsDrawer
+          theme={theme}
+          fontSize={fontSize}
+          density={density}
+          widgets={dashboardWidgets}
+          onThemeChange={(value) => { setTheme(value); window.localStorage.setItem("ny-secure-theme", value); }}
+          onFontSizeChange={updateFontSize}
+          onDensityChange={updateDensity}
+          onWidgetsChange={updateDashboardWidgets}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </main>
   );
 }
@@ -791,6 +858,8 @@ function Overview({
   activeAssignmentsFor,
   onViewAll,
   onOpenStat,
+  enabledWidgets,
+  onCustomize,
 }: {
   data: StatePayload;
   stats: { activePeople: number; credentials: number; grants: number; denials: number };
@@ -802,18 +871,32 @@ function Overview({
   activeAssignmentsFor: (personId: string) => Assignment[];
   onViewAll: () => void;
   onOpenStat: (tab: StatTab) => void;
+  enabledWidgets: DashboardWidget[];
+  onCustomize: () => void;
 }) {
+  const has = (widget: DashboardWidget) => enabledWidgets.includes(widget);
+  if (enabledWidgets.length === 0) {
+    return (
+      <section className="dashboard-empty panel">
+        <span className="dashboard-empty-icon" aria-hidden="true">＋</span>
+        <p className="eyebrow">Your overview</p>
+        <h2>Start with a clean canvas.</h2>
+        <p>Choose only the security information you want to see when you open NY-Secure. You can change it at any time.</p>
+        <button className="primary-button" onClick={onCustomize} type="button">Choose dashboard widgets</button>
+      </section>
+    );
+  }
   return (
     <>
-      <div className="stats-grid">
+      {has("stats") && <div className="stats-grid">
         <StatCard labelText="People on site" value={stats.activePeople} detail={`Across ${data.organizations.length} organizations`} trend="+3 today" tone="teal" onClick={() => onOpenStat("people")} />
         <StatCard labelText="Active credentials" value={stats.credentials} detail="2 expire this week" trend="98% healthy" tone="blue" onClick={() => onOpenStat("credentials")} />
         <StatCard labelText="Access granted" value={stats.grants} detail="Today’s decisions" trend="+8.2%" tone="green" onClick={() => onOpenStat("grants")} />
         <StatCard labelText="Access denied" value={stats.denials} detail="Review recommended" trend={`${Math.min(stats.denials, 9)} open`} tone="amber" onClick={() => onOpenStat("denials")} />
-      </div>
+      </div>}
 
-      <div className="overview-grid">
-        <section className="panel facility-panel">
+      {(has("facility") || has("activity")) && <div className={`overview-grid ${has("facility") !== has("activity") ? "single-widget" : ""}`}>
+        {has("facility") && <section className="panel facility-panel">
           <PanelHeader eyebrow="Live facility" title="NY-Secure DC-01" meta="80 readers online" />
           <FacilityMap
             zones={data.zones}
@@ -840,20 +923,20 @@ function Overview({
               <button type="button">Inspect →</button>
             </div>
           )}
-        </section>
+        </section>}
 
-        <section className="panel activity-panel">
+        {has("activity") && <section className="panel activity-panel">
           <PanelHeader eyebrow="Streaming now" title="Recent activity" action="View full log" onAction={onViewAll} />
           <div className="event-feed">
             {data.events.slice(0, 7).map((event) => (
               <EventFeedItem key={event.id} event={event} />
             ))}
           </div>
-        </section>
-      </div>
+        </section>}
+      </div>}
 
-      <div className="secondary-grid">
-        <section className="panel attention-panel">
+      {(has("attention") || has("roster")) && <div className={`secondary-grid ${has("attention") !== has("roster") ? "single-widget" : ""}`}>
+        {has("attention") && <section className="panel attention-panel">
           <PanelHeader eyebrow="Action queue" title="Needs attention" meta="3 items" />
           <div className="attention-list">
             <div className="attention-item amber-attention">
@@ -867,8 +950,8 @@ function Overview({
               <button type="button">Open</button>
             </div>
           </div>
-        </section>
-        <section className="panel roster-panel">
+        </section>}
+        {has("roster") && <section className="panel roster-panel">
           <PanelHeader eyebrow="Currently active" title="On-site roster" meta={`${data.people.length} people`} />
           <div className="mini-roster">
             {data.people.slice(0, 5).map((person, index) => (
@@ -884,8 +967,8 @@ function Overview({
               </div>
             ))}
           </div>
-        </section>
-      </div>
+        </section>}
+      </div>}
     </>
   );
 }
@@ -953,11 +1036,11 @@ function EventFeedItem({ event }: { event: AccessEvent }) {
     <article className="event-item">
       <span className={`decision-mark ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"}</span>
       <div className="event-copy">
-        <strong>{event.personName || "Unknown credential"}</strong>
-        <span>{event.zoneName || label(event.zoneId)}</span>
-        <small>{event.explanation || label(event.reasonCode)}</small>
+        <small>Who</small><strong>{event.personName || "Unknown credential"}</strong>
       </div>
-      <div className="event-time"><strong>{formatTime(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></div>
+      <div className="event-copy event-what"><small>What</small><strong>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</strong><span>{label(event.reasonCode)}</span></div>
+      <div className="event-copy event-where"><small>Where</small><strong>{event.zoneName || label(event.zoneId)}</strong></div>
+      <div className="event-time"><small>Time</small><strong>{formatTime(event.occurredAt)}</strong><span>{relativeEventTime(event.occurredAt)}</span></div>
     </article>
   );
 }
@@ -1130,7 +1213,7 @@ function OrganizationsView({ organizations, people, zones }: { organizations: Or
           <article className="panel organization-card" key={org.id}>
             <div className="org-card-top"><span className={`org-logo org-hue-${index % 6}`}>{org.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span className={`type-pill ${org.type.toLowerCase()}`}>{label(org.type)}</span><button type="button">•••</button></div>
             <h2>{org.name}</h2>
-            <p>{org.type === "OPERATOR" ? "Site owner and facility operator" : org.type === "CUSTOMER" ? "Colocation tenant organization" : "Approved service partner"}</p>
+            <p>{org.type === "DATA_CENTER_OPERATOR" ? "Site owner and facility operator" : org.type === "COLOCATION_CUSTOMER" ? "Colocation tenant organization" : org.type === "NETWORK_PROVIDER" ? "Approved network service provider" : "Approved service partner"}</p>
             <div className="org-metrics"><div><strong>{orgPeople.length}</strong><small>People</small></div><div><strong>{ownedZones.length}</strong><small>Owned zones</small></div><div><strong>{orgPeople.filter((person) => person.badgeStatus === "ACTIVE").length}</strong><small>Active badges</small></div></div>
             <div className="org-people-stack">{orgPeople.slice(0, 4).map((person, personIndex) => <span className={`avatar hue-${personIndex % 5}`} key={person.id}>{initials(person.firstName, person.lastName)}</span>)}{orgPeople.length === 0 && <small>No people added yet</small>}</div>
             {ownedZones.length > 0 && <div className="org-zone"><span>Dedicated space</span><strong>{ownedZones.map((zone) => zone.name).join(", ")}</strong></div>}
@@ -1191,10 +1274,47 @@ function FacilityView({ zones, selectedZone, selectedZoneId, setSelectedZoneId }
 }
 
 function ActivityView({ events }: { events: AccessEvent[] }) {
+  const [search, setSearch] = useState("");
+  const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED">("ALL");
+  const [zone, setZone] = useState("ALL");
+  const zones = Array.from(new Set(events.map((event) => event.zoneName || event.zoneId))).sort();
+  const filteredEvents = events.filter((event) => {
+    const needle = search.trim().toLowerCase();
+    const matchesSearch = !needle || [event.personName, event.zoneName, event.reasonCode, event.explanation].join(" ").toLowerCase().includes(needle);
+    const matchesDecision = decision === "ALL" || event.decision === decision;
+    const matchesZone = zone === "ALL" || (event.zoneName || event.zoneId) === zone;
+    return matchesSearch && matchesDecision && matchesZone;
+  });
+
+  function exportCsv() {
+    const header = ["Time", "Who", "What", "Where", "When"];
+    const rows = filteredEvents.map((event) => [
+      formatTime(event.occurredAt),
+      event.personName || "Unknown credential",
+      event.decision === "GRANTED" ? "Access granted" : "Access denied",
+      event.zoneName || event.zoneId,
+      formatDate(event.occurredAt),
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = "ny-secure-activity.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   return (
     <section className="panel directory-panel">
-      <div className="directory-toolbar"><label className="table-search"><span>⌕</span><input placeholder="Search events…" /></label><div className="toolbar-filters"><button type="button">All decisions <span>⌄</span></button><button type="button">All zones <span>⌄</span></button><button type="button">Today <span>⌄</span></button></div><button className="export-button" type="button">Export CSV</button></div>
-      <div className="table-wrap"><table className="data-table activity-table"><thead><tr><th>Time</th><th>Decision</th><th>Person</th><th>Organization</th><th>Zone / reader</th><th>Reason</th><th>Event ID</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td><strong>{formatTime(event.occurredAt)}</strong><small>{new Date(event.occurredAt).toLocaleDateString()}</small></td><td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision}</span></td><td><strong>{event.personName || "Unknown"}</strong></td><td>{event.organizationName || "—"}</td><td><strong>{event.zoneName || event.zoneId}</strong><small>Entry reader</small></td><td><code>{event.reasonCode}</code><small>{event.explanation}</small></td><td><code>EVT-{String(event.id).padStart(5, "0")}</code></td></tr>)}</tbody></table></div>
+      <div className="directory-toolbar activity-toolbar">
+        <label className="table-search"><span>⌕</span><input aria-label="Search activity" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search who, what, or where…" /></label>
+        <div className="toolbar-filters">
+          <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="GRANTED">Granted</option><option value="DENIED">Denied</option></select>
+          <select aria-label="Filter by zone" value={zone} onChange={(event) => setZone(event.target.value)}><option value="ALL">All locations</option>{zones.map((item) => <option key={item}>{item}</option>)}</select>
+        </div>
+        <span className="result-count">{filteredEvents.length} events</span>
+        <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
+      </div>
+      <div className="table-wrap"><table className="data-table activity-table simplified"><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Where</th><th>When</th></tr></thead><tbody>{filteredEvents.map((event) => <tr key={event.id}><td><strong className="military-time">{formatTime(event.occurredAt)}</strong></td><td><strong>{event.personName || "Unknown credential"}</strong></td><td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{label(event.reasonCode)}</small></td><td><strong>{event.zoneName || event.zoneId}</strong><small>Entry reader</small></td><td><strong>{formatDate(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td></tr>)}</tbody></table>{filteredEvents.length === 0 && <div className="activity-empty"><strong>No matching activity</strong><span>Try a different search or filter.</span></div>}</div>
     </section>
   );
 }
@@ -1212,6 +1332,44 @@ function photoFor(personId: string) {
   let hash = 0;
   for (const char of personId) hash = (hash + char.charCodeAt(0)) % PERSON_PHOTOS.length;
   return PERSON_PHOTOS[hash];
+}
+
+function SettingsDrawer({
+  theme,
+  fontSize,
+  density,
+  widgets,
+  onThemeChange,
+  onFontSizeChange,
+  onDensityChange,
+  onWidgetsChange,
+  onClose,
+}: {
+  theme: "light" | "dark";
+  fontSize: FontSizePreference;
+  density: DensityPreference;
+  widgets: DashboardWidget[];
+  onThemeChange: (value: "light" | "dark") => void;
+  onFontSizeChange: (value: FontSizePreference) => void;
+  onDensityChange: (value: DensityPreference) => void;
+  onWidgetsChange: (value: DashboardWidget[]) => void;
+  onClose: () => void;
+}) {
+  function toggleWidget(widget: DashboardWidget) {
+    onWidgetsChange(widgets.includes(widget) ? widgets.filter((item) => item !== widget) : [...widgets, widget]);
+  }
+  return (
+    <div className="drawer-backdrop settings-backdrop" onMouseDown={onClose}>
+      <aside className="settings-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Display and dashboard settings">
+        <header className="settings-header"><div><p className="eyebrow">Personal workspace</p><h2>Settings</h2><p>Adjust readability and choose what appears on your overview.</p></div><button className="close-button" onClick={onClose} type="button" aria-label="Close settings">×</button></header>
+        <section className="settings-section"><div className="settings-section-title"><h3>Appearance</h3><p>Saved for this device.</p></div><div className="segmented-setting" role="group" aria-label="Color theme"><button className={theme === "light" ? "active" : ""} onClick={() => onThemeChange("light")} type="button">☀ Light</button><button className={theme === "dark" ? "active" : ""} onClick={() => onThemeChange("dark")} type="button">☾ Dark</button></div></section>
+        <section className="settings-section"><div className="settings-section-title"><h3>Text size</h3><p>Scales interface text without changing browser zoom.</p></div><div className="font-size-options"><button className={fontSize === "small" ? "active" : ""} onClick={() => onFontSizeChange("small")} type="button"><span>Aa</span><small>Small</small></button><button className={fontSize === "comfortable" ? "active" : ""} onClick={() => onFontSizeChange("comfortable")} type="button"><span>Aa</span><small>Comfortable</small></button><button className={fontSize === "large" ? "active" : ""} onClick={() => onFontSizeChange("large")} type="button"><span>Aa</span><small>Large</small></button></div></section>
+        <section className="settings-section"><div className="settings-section-title"><h3>Layout density</h3><p>Controls spacing in lists and tables.</p></div><div className="segmented-setting" role="group" aria-label="Layout density"><button className={density === "compact" ? "active" : ""} onClick={() => onDensityChange("compact")} type="button">Compact</button><button className={density === "comfortable" ? "active" : ""} onClick={() => onDensityChange("comfortable")} type="button">Comfortable</button></div></section>
+        <section className="settings-section dashboard-settings"><div className="settings-section-title"><h3>Overview widgets</h3><p>Leave every option off for a blank home page.</p></div><div className="widget-options">{DASHBOARD_WIDGETS.map((widget) => <label key={widget.id}><span><strong>{widget.label}</strong><small>{widget.description}</small></span><input type="checkbox" checked={widgets.includes(widget.id)} onChange={() => toggleWidget(widget.id)} /><i aria-hidden="true" /></label>)}</div><div className="settings-actions"><button onClick={() => onWidgetsChange(DASHBOARD_WIDGETS.map((widget) => widget.id))} type="button">Show all</button><button onClick={() => onWidgetsChange([])} type="button">Clear overview</button></div></section>
+        <footer className="settings-footer"><span>{widgets.length} of {DASHBOARD_WIDGETS.length} widgets selected</span><button className="primary-button" onClick={onClose} type="button">Done</button></footer>
+      </aside>
+    </div>
+  );
 }
 
 function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayload; onClose: () => void }) {
@@ -1237,7 +1395,7 @@ function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayloa
           {(tab === "grants" || tab === "denials") ? eventRows.map((event) => (
             <article className="photo-log-row" key={event.id}>
               <Image src={photoFor(event.personId)} alt="" width={46} height={46} unoptimized />
-              <div><strong>{event.personName || "Unknown credential"}</strong><span>{event.organizationName || "External visitor"}</span><small>{event.zoneName} · {event.explanation || label(event.reasonCode)}</small></div>
+              <div><strong>{event.personName || "Unknown credential"}</strong><span>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{event.zoneName} · {label(event.reasonCode)}</small></div>
               <time><b>{formatTime(event.occurredAt)}</b><small>{relativeEventTime(event.occurredAt)}</small></time>
             </article>
           )) : personRows.map((person, index) => (
