@@ -6,6 +6,8 @@ NY-Secure is an enterprise physical-security simulator designed to make a coloca
 
 For the living record of implemented behavior and decision logic, see [CAPABILITIES.md](./CAPABILITIES.md).
 
+**Latest update:** Fixed the People tab and added the new search features, internal results tabs, contact cards, and person profile tabs.
+
 The prototype intentionally does not communicate with real readers, controllers, doors, or identity systems. Every organization, person, badge number, and event is fictional.
 
 ## Included in this version
