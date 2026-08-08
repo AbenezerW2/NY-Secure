@@ -488,23 +488,6 @@ export default function AtlasConsole() {
     };
   }, [data]);
 
-  const filteredPeople = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return [];
-    return (data?.people ?? []).filter((person) =>
-      [
-        person.firstName,
-        person.lastName,
-        person.organizationName,
-        orgMap.get(person.organizationId)?.name,
-        orgMap.get(person.organizationId)?.oid,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [data, orgMap, query]);
-
   async function runSimulation() {
     if (!selectedPersonId || !simulationZoneId) return;
     setSimulating(true);
@@ -706,12 +689,8 @@ export default function AtlasConsole() {
               )}
               {activeView === "people" && (
                 <PeopleView
-                  people={filteredPeople}
-                  allPeopleCount={data.people.length}
+                  people={data.people}
                   orgMap={orgMap}
-                  query={query}
-                  setQuery={setQuery}
-                  onAdd={() => setShowAddPerson(true)}
                 />
               )}
               {activeView === "organizations" && (
@@ -1117,20 +1096,29 @@ function Operations({
 
 function PeopleView({
   people,
-  allPeopleCount,
   orgMap,
-  query,
-  setQuery,
-  onAdd,
 }: {
   people: Person[];
-  allPeopleCount: number;
   orgMap: Map<string, Organization>;
-  query: string;
-  setQuery: (value: string) => void;
-  onAdd: () => void;
 }) {
-  const hasQuery = query.trim().length > 0;
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [company, setCompany] = useState("");
+  const [oid, setOid] = useState("");
+  const hasQuery = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
+  const filteredPeople = useMemo(() => {
+    if (!hasQuery) return [];
+    const matches = (value: string, search: string) => value.toLowerCase().includes(search.trim().toLowerCase());
+    return people.filter((person) => {
+      const organization = orgMap.get(person.organizationId);
+      return (
+        (!firstName.trim() || matches(person.firstName, firstName)) &&
+        (!lastName.trim() || matches(person.lastName, lastName)) &&
+        (!company.trim() || matches(person.organizationName || organization?.name || "", company)) &&
+        (!oid.trim() || matches(organization?.oid || person.organizationId, oid))
+      );
+    });
+  }, [company, firstName, hasQuery, lastName, oid, orgMap, people]);
   return (
     <section className="panel directory-panel people-directory">
       <div className="people-search-header">
@@ -1139,15 +1127,18 @@ function PeopleView({
           <h2>Find a person</h2>
           <p>Search by first name, last name, OID, or company.</p>
         </div>
-        <button className="primary-button" onClick={onAdd} type="button">Add person</button>
       </div>
       <div className="people-search-box">
-        <label className="people-query"><span aria-hidden="true">⌕</span><input aria-label="Search people database" placeholder="Try “Amara”, “Citadel”, or “OID-CITADEL-SECURITIES”" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus /></label>
-        <div className="search-keywords" aria-label="Supported search fields"><span>First name</span><span>Last name</span><span>OID</span><span>Company</span></div>
+        <div className="people-search-grid">
+          <label className="people-query"><span>First name</span><input aria-label="Search by first name" placeholder="e.g. Amara" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoFocus /></label>
+          <label className="people-query"><span>Last name</span><input aria-label="Search by last name" placeholder="e.g. Okafor" value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
+          <label className="people-query"><span>Company name</span><input aria-label="Search by company name" placeholder="e.g. Citadel Securities" value={company} onChange={(event) => setCompany(event.target.value)} /></label>
+          <label className="people-query"><span>OID</span><input aria-label="Search by OID" placeholder="e.g. OID-CITADEL-SECURITIES" value={oid} onChange={(event) => setOid(event.target.value)} /></label>
+        </div>
       </div>
-      {!hasQuery && <div className="people-search-empty"><span>⌕</span><h3>Search the people database</h3><p>{allPeopleCount} records are indexed. Results stay hidden until you search, so the directory remains useful as it grows.</p></div>}
-      {hasQuery && people.length > 0 && <><div className="people-results-meta"><strong>{people.length} {people.length === 1 ? "result" : "results"}</strong><span>Matched against name, OID, and company</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th></tr></thead><tbody>{people.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td></tr>; })}</tbody></table></div></>}
-      {hasQuery && people.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the spelling or try a first name, last name, OID, or company.</p><button className="primary-button" onClick={onAdd} type="button">Add person</button></div>}
+      {!hasQuery && <div className="people-search-empty"><span>⌕</span><h3>Search the people database</h3></div>}
+      {hasQuery && filteredPeople.length > 0 && <><div className="people-results-meta"><strong>{filteredPeople.length} {filteredPeople.length === 1 ? "result" : "results"}</strong><span>All entered parameters must match</span></div><div className="table-wrap"><table className="data-table people-table identity-results"><thead><tr><th>First name</th><th>Last name</th><th>OID</th><th>Company</th><th>Phone</th><th>Work email</th><th>Record type</th></tr></thead><tbody>{filteredPeople.map((person) => { const organization = orgMap.get(person.organizationId); return <tr key={person.id}><td><strong>{person.firstName}</strong></td><td><strong>{person.lastName}</strong></td><td><code>{organization?.oid ?? person.organizationId}</code></td><td><strong className="org-name">{person.organizationName || organization?.name}</strong></td><td><a href={`tel:${person.phoneNumber}`}>{person.phoneNumber || "Not provided"}</a></td><td><a href={`mailto:${person.email}`}>{person.email}</a></td><td><span className="type-pill">{person.relationshipType === "ENGINEER" ? "Internal employee" : label(person.relationshipType)}</span></td></tr>; })}</tbody></table></div></>}
+      {hasQuery && filteredPeople.length === 0 && <div className="table-empty people-no-results"><span>⌕</span><h3>No matching people</h3><p>Check the entered first name, last name, company, or OID.</p></div>}
     </section>
   );
 }

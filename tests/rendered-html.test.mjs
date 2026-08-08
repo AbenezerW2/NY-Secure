@@ -19,6 +19,12 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /hour12:\s*false/);
   assert.match(consoleSource, /Simulate access/);
   assert.match(consoleSource, /Search by first name, last name, OID, or company/);
+  assert.match(consoleSource, /aria-label="Search by first name"/);
+  assert.match(consoleSource, /aria-label="Search by last name"/);
+  assert.match(consoleSource, /aria-label="Search by company name"/);
+  assert.match(consoleSource, /aria-label="Search by OID"/);
+  assert.doesNotMatch(consoleSource, /records are indexed/);
+  assert.doesNotMatch(consoleSource, /onClick=\{onAdd\}/);
   assert.match(consoleSource, /name="phoneNumber"/);
   assert.match(consoleSource, /Internal employee/);
   assert.match(consoleSource, /Badge access and activity are managed outside this board/);

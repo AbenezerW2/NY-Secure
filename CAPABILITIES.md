@@ -92,6 +92,8 @@ work_email
 record_type
 ```
 
+Each search key has its own input. Populated parameters are combined with AND matching, while blank parameters are ignored. The page header is the only location for the Add person action, and the empty state does not reveal a directory record count.
+
 OID currently uses a stable human-readable value derived from the organization slug, such as `OID-CITADEL-SECURITIES`. A dedicated OID data model is reserved for the later organization-management phase.
 
 Identity and authorization are deliberately separate:
