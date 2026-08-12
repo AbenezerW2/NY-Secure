@@ -104,6 +104,25 @@ type ScheduledVisitRow = {
   createdAt: string;
 };
 
+type SiteCheckInRow = {
+  id: string;
+  personId: string;
+  personName: string;
+  organizationId: string;
+  organizationName: string;
+  relationshipType: string;
+  badgeNumber: string;
+  source: "PORTAL" | "KIOSK";
+  status: "PENDING" | "ON_SITE" | "SIGNED_OUT" | "REJECTED";
+  requestedAt: string;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  signedOutAt: string | null;
+  notes: string;
+  lastScanAt: string | null;
+  lastScanZone: string | null;
+};
+
 type CountRow = {
   totalPeople: number;
   activePeople: number;
@@ -124,6 +143,7 @@ export async function getState(db: D1Database) {
     eventResult,
     alarmResult,
     visitResult,
+    checkInResult,
     countResult,
   ] = await Promise.all([
     db
@@ -264,6 +284,32 @@ export async function getState(db: D1Database) {
     db
       .prepare(
         `SELECT
+          c.id, c.person_id AS personId,
+          p.first_name || ' ' || p.last_name AS personName,
+          p.organization_id AS organizationId, o.name AS organizationName,
+          p.relationship_type AS relationshipType,
+          p.badge_number AS badgeNumber, c.source, c.status,
+          c.requested_at AS requestedAt, c.verified_at AS verifiedAt,
+          c.verified_by AS verifiedBy, c.signed_out_at AS signedOutAt,
+          c.notes,
+          (SELECT e.attempted_at FROM access_events e
+            WHERE e.person_id = c.person_id
+            ORDER BY e.attempted_at DESC LIMIT 1) AS lastScanAt,
+          (SELECT z.name FROM access_events e
+            JOIN zones z ON z.id = e.zone_id
+            WHERE e.person_id = c.person_id
+            ORDER BY e.attempted_at DESC LIMIT 1) AS lastScanZone
+         FROM site_check_ins c
+         JOIN people p ON p.id = c.person_id
+         JOIN organizations o ON o.id = p.organization_id
+         WHERE c.status IN ('PENDING', 'ON_SITE')
+         ORDER BY CASE c.status WHEN 'PENDING' THEN 0 ELSE 1 END,
+           c.requested_at DESC`,
+      )
+      .all<SiteCheckInRow>(),
+    db
+      .prepare(
+        `SELECT
           (SELECT COUNT(*) FROM people) AS totalPeople,
           (SELECT COUNT(*) FROM people WHERE active = 1) AS activePeople,
           (SELECT COUNT(*) FROM access_assignments a
@@ -357,6 +403,7 @@ export async function getState(db: D1Database) {
     events: eventResult.results,
     alarms: alarmResult.results,
     scheduledVisits,
+    checkIns: checkInResult.results,
     stats: {
       organizationCount: organizations.filter((organization) => organization.active)
         .length,

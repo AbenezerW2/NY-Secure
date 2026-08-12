@@ -904,6 +904,53 @@ select:focus-visible {
 .people-tab-shell { flex: 0 0 auto; }
 .people-workspace-tabs > button { min-height: 39px; padding: 0 14px; color: #61757c; background: #e9eef2; border: 1px solid #d8e1e6; border-bottom: 0; border-radius: 8px 8px 0 0; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
 .people-workspace-tabs > button.active { color: #245fae; background: #fff; }
+.people-workspace-tabs > button > b { min-width: 18px; margin-left: 5px; padding: 2px 5px; color: #526a73; background: rgba(91, 116, 128, .12); border-radius: 999px; font-size: calc(6px * var(--font-scale)); }
+.people-workspace-tabs > button.active > b { color: #245fae; background: #e4efff; }
+.people-checkin-error { margin-bottom: 10px; padding: 10px 12px; color: var(--red); background: var(--red-soft); border: 1px solid #edcccc; border-radius: 8px; font-size: calc(8px * var(--font-scale)); }
+.people-presence-panel { min-height: clamp(480px, 60vh, 740px); overflow: hidden; }
+.presence-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 25px; border-bottom: 1px solid var(--line); }
+.presence-header h2 { margin: 4px 0 0; color: var(--ink); font-size: calc(18px * var(--font-scale)); }
+.presence-header > div > p:last-child { margin: 6px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
+.presence-total { display: grid; min-width: 88px; gap: 3px; padding: 11px 14px; color: #167b5b; background: #e9f6f1; border: 1px solid #d0eadf; border-radius: 9px; text-align: center; }
+.presence-total.pending { color: #a2611f; background: #fff4e4; border-color: #f1dfc3; }
+.presence-total strong { font-size: calc(19px * var(--font-scale)); line-height: 1; }
+.presence-total small { font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
+.presence-card-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; padding: 20px; }
+.presence-card { overflow: hidden; background: #fff; border: 1px solid #dce5e8; border-radius: 11px; box-shadow: 0 4px 13px rgba(26, 58, 74, .05); }
+.presence-card-person { display: flex; align-items: center; gap: 11px; padding: 14px 15px; border-bottom: 1px solid #e8edef; }
+.presence-card-person > div { min-width: 0; flex: 1; }
+.presence-card-person strong, .presence-card-person small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presence-card-person strong { color: var(--ink); font-size: calc(10px * var(--font-scale)); }
+.presence-card-person small { margin-top: 3px; color: var(--muted); font-size: calc(7px * var(--font-scale)); }
+.presence-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border-radius: 999px; font-size: calc(6px * var(--font-scale)); font-weight: 760; }
+.presence-status.onsite { color: #167b5b; background: #e7f5ef; }
+.presence-status i { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 3px rgba(22, 123, 91, .1); }
+.presence-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 6px 15px; }
+.presence-card dl > div { min-width: 0; padding: 10px 0; border-bottom: 1px solid #edf1f2; }
+.presence-card dl > div:nth-last-child(-n + 2) { border-bottom: 0; }
+.presence-card dt { margin-bottom: 4px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 730; letter-spacing: .06em; text-transform: uppercase; }
+.presence-card dd { margin: 0; color: #415961; font-size: calc(8px * var(--font-scale)); font-weight: 650; overflow-wrap: anywhere; }
+.presence-card dd small { display: block; margin-top: 3px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 500; }
+.presence-card code { font-family: var(--font-geist-mono), monospace; }
+.presence-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 15px; color: var(--soft-muted); background: #f8fafb; border-top: 1px solid #e8edef; font-size: calc(6px * var(--font-scale)); }
+.presence-card footer .secondary-button { min-height: 31px; }
+.presence-empty { display: grid; min-height: 330px; place-items: center; align-content: center; gap: 7px; color: var(--soft-muted); text-align: center; }
+.presence-empty > span { font-size: calc(30px * var(--font-scale)); }
+.presence-empty h3 { margin: 4px 0 0; color: var(--ink); font-size: calc(13px * var(--font-scale)); }
+.presence-empty p { margin: 0; font-size: calc(8px * var(--font-scale)); }
+.pending-checkin-list { display: grid; }
+.pending-checkin-list article { display: grid; grid-template-columns: minmax(230px, 1.4fr) minmax(130px, .7fr) minmax(100px, .5fr) auto; align-items: center; gap: 18px; padding: 15px 20px; border-bottom: 1px solid var(--line); }
+.pending-checkin-list article:last-child { border-bottom: 0; }
+.pending-person { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.pending-person > div { min-width: 0; }
+.pending-person strong, .pending-person small, .pending-origin span, .pending-origin strong, .pending-origin small, .pending-credential span { display: block; }
+.pending-person strong { color: var(--ink); font-size: calc(10px * var(--font-scale)); }
+.pending-person small, .pending-origin span, .pending-origin small, .pending-credential span { margin-top: 3px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); }
+.pending-origin strong { margin-top: 4px; color: var(--ink); font-size: calc(9px * var(--font-scale)); }
+.pending-credential code { display: block; margin-top: 5px; color: #415961; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
+.pending-actions { display: flex; justify-content: flex-end; gap: 7px; }
+.pending-actions button { white-space: nowrap; }
+.reject-checkin { color: var(--red); }
 .people-tab-shell { display: flex; min-height: 39px; align-items: stretch; background: #e9eef2; border: 1px solid #d8e1e6; border-bottom: 0; border-radius: 8px 8px 0 0; overflow: hidden; }
 .people-tab-shell.active { background: #fff; }
 .person-tab { display: flex; align-items: center; gap: 7px; padding: 0 7px 0 11px; color: #61757c; background: transparent; border: 0; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
@@ -1699,6 +1746,10 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .people-workspace-tabs { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button, .people-tab-shell) { color: #8fa2b9; background: #132238; border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button.active, .people-tab-shell.active) { color: #a9c8ff; background: var(--surface); }
+.app-shell[data-theme="dark"] :is(.presence-card, .presence-card footer) { background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.presence-card dd, .pending-credential code) { color: var(--ink); }
+.app-shell[data-theme="dark"] .presence-total { color: #8ed6bd; background: #11362e; border-color: #225a4c; }
+.app-shell[data-theme="dark"] .presence-total.pending { color: #f2c078; background: #3b2b15; border-color: #6a4b20; }
 .app-shell[data-theme="dark"] .contact-results-panel > header { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.contact-results-panel > header h2, .contact-card-name strong) { color: var(--ink); }
 .app-shell[data-theme="dark"] .person-contact-card { background: #132238; border-color: var(--line); }
@@ -1834,6 +1885,12 @@ select:focus-visible {
   .profile-tabs button { height: 43px; padding-inline: 9px; font-size: calc(8px * var(--font-scale)); }
   .profile-tab-content { padding: 22px 18px 28px; }
   .profile-contact dl { grid-template-columns: 1fr; }
+  .presence-header { align-items: flex-start; padding: 19px 17px; }
+  .presence-card-grid { grid-template-columns: 1fr; padding: 14px; }
+  .pending-checkin-list article { grid-template-columns: 1fr 1fr; gap: 13px; padding: 15px 17px; }
+  .pending-person, .pending-actions { grid-column: 1 / -1; }
+  .pending-actions { justify-content: stretch; }
+  .pending-actions button { flex: 1; }
   .locator-search-panel { padding: 18px; }
   .locator-form { grid-template-columns: 1fr; }
   .locator-form .primary-button { width: 100%; }

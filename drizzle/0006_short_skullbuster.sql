@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `idx_site_check_ins_person_open` ON `site_check_ins` (`person_id`) WHERE status IN ('PENDING', 'ON_SITE');

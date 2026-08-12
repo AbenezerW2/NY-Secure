@@ -121,6 +121,24 @@ type ScheduledVisit = {
   status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
 };
 
+type SiteCheckIn = {
+  id: string;
+  personId: string;
+  personName: string;
+  organizationId: string;
+  organizationName: string;
+  relationshipType: string;
+  badgeNumber: string;
+  source: "PORTAL" | "KIOSK";
+  status: "PENDING" | "ON_SITE";
+  requestedAt: string;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  notes: string;
+  lastScanAt?: string | null;
+  lastScanZone?: string | null;
+};
+
 type StatePayload = {
   organizations: Organization[];
   zones: Zone[];
@@ -130,6 +148,7 @@ type StatePayload = {
   events: AccessEvent[];
   alarms: Alarm[];
   scheduledVisits: ScheduledVisit[];
+  checkIns: SiteCheckIn[];
   stats?: {
     activePeople?: number;
     activeCredentials?: number;
@@ -304,6 +323,7 @@ function normalizeState(source: {
   events?: Array<Record<string, unknown>>;
   alarms?: Array<Record<string, unknown>>;
   scheduledVisits?: Array<Record<string, unknown>>;
+  checkIns?: Array<Record<string, unknown>>;
   stats?: Record<string, unknown>;
 }): StatePayload {
   const organizations: Organization[] = (source.organizations ?? []).map((item) => ({
@@ -449,6 +469,23 @@ function normalizeState(source: {
     packageDetails: String(item.packageDetails ?? ""),
     status: (["SCHEDULED", "ACTIVE", "EXPIRED", "CANCELLED"].includes(String(item.status)) ? String(item.status) : "SCHEDULED") as ScheduledVisit["status"],
   }));
+  const checkIns: SiteCheckIn[] = (source.checkIns ?? []).map((item) => ({
+    id: String(item.id),
+    personId: String(item.personId),
+    personName: String(item.personName ?? "Unknown person"),
+    organizationId: String(item.organizationId),
+    organizationName: String(item.organizationName ?? "Unknown organization"),
+    relationshipType: String(item.relationshipType ?? "VISITOR"),
+    badgeNumber: String(item.badgeNumber ?? "UNISSUED"),
+    source: String(item.source) === "PORTAL" ? "PORTAL" : "KIOSK",
+    status: String(item.status) === "ON_SITE" ? "ON_SITE" : "PENDING",
+    requestedAt: String(item.requestedAt),
+    verifiedAt: item.verifiedAt ? String(item.verifiedAt) : null,
+    verifiedBy: item.verifiedBy ? String(item.verifiedBy) : null,
+    notes: String(item.notes ?? ""),
+    lastScanAt: item.lastScanAt ? String(item.lastScanAt) : null,
+    lastScanZone: item.lastScanZone ? String(item.lastScanZone) : null,
+  }));
   return {
     organizations,
     zones,
@@ -458,6 +495,7 @@ function normalizeState(source: {
     events,
     alarms,
     scheduledVisits,
+    checkIns,
     stats: {
       activePeople: Number(source.stats?.activePeople ?? people.filter((person) => person.status === "ACTIVE").length),
       activeCredentials: people.filter((person) => person.badgeStatus === "ACTIVE").length,
@@ -599,8 +637,7 @@ export default function NySecureConsole() {
   const stats = useMemo(() => {
     const events = data?.events ?? [];
     return {
-      activePeople:
-        data?.stats?.activePeople ?? data?.people.filter((person) => person.status === "ACTIVE").length ?? 0,
+      activePeople: data?.checkIns.filter((checkIn) => checkIn.status === "ON_SITE").length ?? 0,
       credentials:
         data?.stats?.activeCredentials ??
         data?.people.filter((person) => person.badgeStatus === "ACTIVE").length ??
@@ -794,7 +831,6 @@ export default function NySecureConsole() {
                   selectedZone={selectedZone}
                   selectedZoneId={selectedZoneId}
                   setSelectedZoneId={setSelectedZoneId}
-                  orgMap={orgMap}
                   profileMap={profileMap}
                   activeAssignmentsFor={activeAssignmentsFor}
                   onViewAll={() => setActiveView("activity")}
@@ -826,6 +862,8 @@ export default function NySecureConsole() {
                   profiles={profileMap}
                   events={data.events}
                   zones={zoneMap}
+                  checkIns={data.checkIns}
+                  onCheckInsChanged={loadState}
                 />
               )}
               {activeView === "organizations" && (
@@ -956,7 +994,6 @@ function Overview({
   selectedZone,
   selectedZoneId,
   setSelectedZoneId,
-  orgMap,
   profileMap,
   activeAssignmentsFor,
   onViewAll,
@@ -969,7 +1006,6 @@ function Overview({
   selectedZone?: Zone;
   selectedZoneId: string;
   setSelectedZoneId: (id: string) => void;
-  orgMap: Map<string, Organization>;
   profileMap: Map<string, Profile>;
   activeAssignmentsFor: (personId: string) => Assignment[];
   onViewAll: () => void;
@@ -978,6 +1014,8 @@ function Overview({
   onCustomize: () => void;
 }) {
   const has = (widget: DashboardWidget) => enabledWidgets.includes(widget);
+  const onSiteCheckIns = data.checkIns.filter((checkIn) => checkIn.status === "ON_SITE");
+  const onSiteOrganizations = new Set(onSiteCheckIns.map((checkIn) => checkIn.organizationId)).size;
   if (enabledWidgets.length === 0) {
     return (
       <section className="dashboard-empty panel">
@@ -992,7 +1030,7 @@ function Overview({
   return (
     <>
       {has("stats") && <div className="stats-grid">
-        <StatCard labelText="People on site" value={stats.activePeople} detail={`Across ${data.organizations.length} organizations`} trend="+3 today" tone="teal" onClick={() => onOpenStat("people")} />
+        <StatCard labelText="People on site" value={stats.activePeople} detail={`Across ${onSiteOrganizations} organizations`} trend={`${data.checkIns.filter((checkIn) => checkIn.status === "PENDING").length} pending`} tone="teal" onClick={() => onOpenStat("people")} />
         <StatCard labelText="Active credentials" value={stats.credentials} detail="2 expire this week" trend="98% healthy" tone="blue" onClick={() => onOpenStat("credentials")} />
         <StatCard labelText="Access granted" value={stats.grants} detail="Today’s decisions" trend="+8.2%" tone="green" onClick={() => onOpenStat("grants")} />
         <StatCard labelText="Access denied" value={stats.denials} detail="Review recommended" trend={`${Math.min(stats.denials, 9)} open`} tone="amber" onClick={() => onOpenStat("denials")} />
@@ -1055,20 +1093,22 @@ function Overview({
           </div>
         </section>}
         {has("roster") && <section className="panel roster-panel">
-          <PanelHeader eyebrow="Currently active" title="On-site roster" meta={`${data.people.length} people`} />
+          <PanelHeader eyebrow="Security verified" title="On-site roster" meta={`${onSiteCheckIns.length} people`} />
           <div className="mini-roster">
-            {data.people.slice(0, 5).map((person, index) => (
-              <div className="mini-person" key={person.id}>
-                <span className={`avatar hue-${index % 5}`}>{initials(person.firstName, person.lastName)}</span>
-                <div><strong>{person.firstName} {person.lastName}</strong><small>{person.organizationName || orgMap.get(person.organizationId)?.name}</small></div>
+            {onSiteCheckIns.slice(0, 5).map((checkIn, index) => {
+              const person = data.people.find((candidate) => candidate.id === checkIn.personId);
+              return <div className="mini-person" key={checkIn.id}>
+                <span className={`avatar hue-${index % 5}`}>{person ? initials(person.firstName, person.lastName) : checkIn.personName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>
+                <div><strong>{checkIn.personName}</strong><small>{checkIn.organizationName}</small></div>
                 <div className="mini-person-access">
-                  {activeAssignmentsFor(person.id).slice(0, 1).map((assignment) => (
+                  {activeAssignmentsFor(checkIn.personId).slice(0, 1).map((assignment) => (
                     <span key={assignment.id}>{profileMap.get(assignment.profileId)?.name}</span>
                   ))}
                 </div>
                 <b className="on-site-dot" title="On site" />
-              </div>
-            ))}
+              </div>;
+            })}
+            {onSiteCheckIns.length === 0 && <p className="empty-copy">No security-verified visitors are on-site.</p>}
           </div>
         </section>}
       </div>}
@@ -1261,6 +1301,8 @@ function PeopleView({
   profiles,
   events,
   zones,
+  checkIns,
+  onCheckInsChanged,
 }: {
   people: Person[];
   orgMap: Map<string, Organization>;
@@ -1268,6 +1310,8 @@ function PeopleView({
   profiles: Map<string, Profile>;
   events: AccessEvent[];
   zones: Map<string, Zone>;
+  checkIns: SiteCheckIn[];
+  onCheckInsChanged: () => Promise<void>;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1275,7 +1319,11 @@ function PeopleView({
   const [oid, setOid] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState<{ firstName: string; lastName: string; company: string; oid: string } | null>(null);
   const [openPeople, setOpenPeople] = useState<Person[]>([]);
-  const [activePeopleTab, setActivePeopleTab] = useState("search");
+  const [activePeopleTab, setActivePeopleTab] = useState("onsite");
+  const [checkInAction, setCheckInAction] = useState<string | null>(null);
+  const [checkInError, setCheckInError] = useState("");
+  const onSite = checkIns.filter((checkIn) => checkIn.status === "ON_SITE");
+  const pending = checkIns.filter((checkIn) => checkIn.status === "PENDING");
   const canSearch = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
   const filteredPeople = useMemo(() => {
     if (!submittedSearch) return [];
@@ -1305,7 +1353,27 @@ function PeopleView({
 
   function closeProfile(personId: string) {
     setOpenPeople((current) => current.filter((person) => person.id !== personId));
-    if (activePeopleTab === personId) setActivePeopleTab("search");
+    if (activePeopleTab === personId) setActivePeopleTab("onsite");
+  }
+
+  async function updateCheckIn(id: string, action: "VERIFY" | "SIGN_OUT" | "REJECT") {
+    setCheckInAction(`${id}-${action}`);
+    setCheckInError("");
+    try {
+      const response = await fetch("/api/check-ins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The check-in could not be updated.");
+      await onCheckInsChanged();
+      if (action === "VERIFY") setActivePeopleTab("onsite");
+    } catch (error) {
+      setCheckInError(error instanceof Error ? error.message : "The check-in could not be updated.");
+    } finally {
+      setCheckInAction(null);
+    }
   }
 
   const activePerson = openPeople.find((person) => person.id === activePeopleTab);
@@ -1313,10 +1381,30 @@ function PeopleView({
   return (
     <div className="people-workspace">
       <nav className="people-workspace-tabs" aria-label="Open People tabs">
-        <button className={activePeopleTab === "search" ? "active" : ""} onClick={() => setActivePeopleTab("search")} type="button"><span aria-hidden="true">⌕</span> Directory search</button>
+        <button className={activePeopleTab === "onsite" ? "active" : ""} onClick={() => setActivePeopleTab("onsite")} type="button"><span aria-hidden="true">●</span> On-site <b>{onSite.length}</b></button>
+        <button className={activePeopleTab === "pending" ? "active" : ""} onClick={() => setActivePeopleTab("pending")} type="button"><span aria-hidden="true">◷</span> Pending <b>{pending.length}</b></button>
+        <button className={activePeopleTab === "search" ? "active" : ""} onClick={() => setActivePeopleTab("search")} type="button"><span aria-hidden="true">⌕</span> Directory</button>
         {submittedSearch && <div className={activePeopleTab === "results" ? "people-tab-shell active" : "people-tab-shell"}><button className="person-tab results-tab" onClick={() => setActivePeopleTab("results")} type="button"><span aria-hidden="true">⌗</span> Search results</button><button className="close-people-tab" aria-label="Close search results" onClick={() => { setSubmittedSearch(null); if (activePeopleTab === "results") setActivePeopleTab("search"); }} type="button">×</button></div>}
         {openPeople.map((person) => <div className={activePeopleTab === person.id ? "people-tab-shell active" : "people-tab-shell"} key={person.id}><button className="person-tab" onClick={() => setActivePeopleTab(person.id)} type="button"><span className="mini-contact-photo" aria-hidden="true"><i /></span>{person.firstName} {person.lastName}</button><button className="close-people-tab" aria-label={`Close ${person.firstName} ${person.lastName} profile`} onClick={() => closeProfile(person.id)} type="button">×</button></div>)}
       </nav>
+    {checkInError && <div className="people-checkin-error" role="alert">{checkInError}</div>}
+    {activePeopleTab === "onsite" && <section className="panel people-presence-panel">
+      <header className="presence-header"><div><p className="eyebrow">Security-verified arrivals</p><h2>People currently on-site</h2><p>Only people verified by security appear in this active roster.</p></div><span className="presence-total"><strong>{onSite.length}</strong><small>On-site now</small></span></header>
+      {onSite.length > 0 ? <div className="presence-card-grid">{onSite.map((checkIn) => <article className="presence-card" key={checkIn.id}>
+        <div className="presence-card-person"><span className="avatar hue-2">{checkIn.personName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{checkIn.personName}</strong><small>{checkIn.organizationName}</small></div><span className="presence-status onsite"><i />On-site</span></div>
+        <dl><div><dt>Record type</dt><dd>{label(checkIn.relationshipType)}</dd></div><div><dt>Badge</dt><dd><code>{checkIn.badgeNumber}</code></dd></div><div><dt>Verified</dt><dd>{checkIn.verifiedAt ? `${formatTime(checkIn.verifiedAt)} · ${checkIn.verifiedBy || "Security"}` : "Security verified"}</dd></div><div><dt>Last scan</dt><dd>{checkIn.lastScanZone || "No scan recorded"}{checkIn.lastScanAt && <small>{relativeEventTime(checkIn.lastScanAt)}</small>}</dd></div></dl>
+        <footer><span>Signed in via {label(checkIn.source)} · {relativeEventTime(checkIn.requestedAt)}</span><button className="secondary-button" disabled={checkInAction === `${checkIn.id}-SIGN_OUT`} onClick={() => updateCheckIn(checkIn.id, "SIGN_OUT")} type="button">{checkInAction === `${checkIn.id}-SIGN_OUT` ? "Signing out…" : "Sign out"}</button></footer>
+      </article>)}</div> : <div className="presence-empty"><span>◎</span><h3>No verified visitors are on-site</h3><p>People appear here after security approves their portal or kiosk sign-in.</p></div>}
+    </section>}
+    {activePeopleTab === "pending" && <section className="panel people-presence-panel pending-presence-panel">
+      <header className="presence-header"><div><p className="eyebrow">Awaiting identity check</p><h2>Pending security verification</h2><p>Review portal and kiosk arrivals before allowing them onto the active on-site roster.</p></div><span className="presence-total pending"><strong>{pending.length}</strong><small>Waiting</small></span></header>
+      {pending.length > 0 ? <div className="pending-checkin-list">{pending.map((checkIn) => <article key={checkIn.id}>
+        <div className="pending-person"><span className="avatar hue-4">{checkIn.personName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{checkIn.personName}</strong><small>{checkIn.organizationName} · {label(checkIn.relationshipType)}</small></div></div>
+        <div className="pending-origin"><span>{label(checkIn.source)} sign-in</span><strong>{formatTime(checkIn.requestedAt)}</strong><small>{relativeEventTime(checkIn.requestedAt)}</small></div>
+        <div className="pending-credential"><span>Badge</span><code>{checkIn.badgeNumber}</code></div>
+        <div className="pending-actions"><button className="secondary-button reject-checkin" disabled={checkInAction !== null} onClick={() => updateCheckIn(checkIn.id, "REJECT")} type="button">Reject</button><button className="primary-button" disabled={checkInAction !== null} onClick={() => updateCheckIn(checkIn.id, "VERIFY")} type="button">{checkInAction === `${checkIn.id}-VERIFY` ? "Verifying…" : "Verify & sign in"}</button></div>
+      </article>)}</div> : <div className="presence-empty"><span>✓</span><h3>No pending sign-ins</h3><p>New portal and kiosk arrivals will wait here for security.</p></div>}
+    </section>}
     {activePeopleTab === "search" && <section className="panel directory-panel people-directory">
       <div className="people-search-header">
         <div>
@@ -1837,7 +1925,12 @@ function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayloa
     denials: { eyebrow: "Review queue", title: "Access denied", description: "Denied attempts requiring security awareness or review." },
   } satisfies Record<StatTab, { eyebrow: string; title: string; description: string }>)[tab];
   const eventRows = data.events.filter((event) => tab === "grants" ? event.decision === "GRANTED" : event.decision === "DENIED");
-  const personRows = data.people.filter((person) => tab === "credentials" ? person.badgeStatus === "ACTIVE" : person.status === "ACTIVE");
+  const personRows = tab === "credentials"
+    ? data.people.filter((person) => person.badgeStatus === "ACTIVE")
+    : data.checkIns
+      .filter((checkIn) => checkIn.status === "ON_SITE")
+      .map((checkIn) => data.people.find((person) => person.id === checkIn.personId))
+      .filter((person): person is Person => Boolean(person));
   const count = tab === "grants" || tab === "denials" ? eventRows.length : personRows.length;
 
   return (
@@ -1855,10 +1948,10 @@ function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayloa
               <div><strong>{event.personName || "Unknown credential"}</strong><span>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{event.zoneName} · {label(event.reasonCode)}</small></div>
               <time><b>{formatTime(event.occurredAt)}</b><small>{relativeEventTime(event.occurredAt)}</small></time>
             </article>
-          )) : personRows.map((person, index) => (
+          )) : personRows.map((person) => (
             <article className="photo-log-row" key={person.id}>
               <Image src={photoFor(person.id)} alt="" width={46} height={46} unoptimized />
-              <div><strong>{person.firstName} {person.lastName}</strong><span>{person.organizationName}</span><small>{tab === "credentials" ? `${person.badgeId} · Credential active` : `${["Hall A", "Secure spine", "NOC", "Loading dock"][index % 4]} · Verified ${8 + index * 3}m ago`}</small></div>
+              <div><strong>{person.firstName} {person.lastName}</strong><span>{person.organizationName}</span><small>{tab === "credentials" ? `${person.badgeId} · Credential active` : `${data.checkIns.find((checkIn) => checkIn.personId === person.id && checkIn.status === "ON_SITE")?.lastScanZone || "No scan recorded"} · Security verified`}</small></div>
               <time><b>{tab === "credentials" ? "ACTIVE" : "ON SITE"}</b><small>{label(person.relationshipType)}</small></time>
             </article>
           ))}
