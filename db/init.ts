@@ -593,6 +593,27 @@ const schemaStatements = [
     occurred_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS scheduled_visits (
+    ticket_number TEXT PRIMARY KEY NOT NULL,
+    site_code TEXT NOT NULL DEFAULT 'DC-01',
+    organization_id TEXT NOT NULL REFERENCES organizations(id),
+    requester_name TEXT NOT NULL,
+    visitor_name TEXT NOT NULL,
+    visitor_email TEXT,
+    visitor_phone TEXT,
+    cage_zone_id TEXT NOT NULL REFERENCES zones(id),
+    cabinet_access TEXT NOT NULL DEFAULT '[]',
+    valid_from TEXT NOT NULL,
+    valid_until TEXT NOT NULL,
+    comments TEXT NOT NULL DEFAULT '',
+    has_delivery INTEGER NOT NULL DEFAULT 0 CHECK (has_delivery IN (0, 1)),
+    package_count INTEGER NOT NULL DEFAULT 0 CHECK (package_count >= 0),
+    package_details TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'SCHEDULED' CHECK (status IN ('SCHEDULED', 'CANCELLED')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (datetime(valid_until) > datetime(valid_from))
+  )`,
   "CREATE INDEX IF NOT EXISTS idx_zones_category_active ON zones(category, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_organization_active ON people(organization_id, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_relationship_type ON people(relationship_type)",
@@ -607,6 +628,8 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS idx_alarms_occurred_at ON alarms(occurred_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_type_status ON alarms(alarm_type, status)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_zone_occurred_at ON alarms(zone_id, occurred_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_valid_from ON scheduled_visits(valid_from DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_organization_valid_from ON scheduled_visits(organization_id, valid_from DESC)",
 ];
 
 let initializationPromise: Promise<void> | undefined;
@@ -940,6 +963,104 @@ async function seedDatabase(db: D1Database) {
           new Date(now.getTime() - alarm.minutesAgo * 60 * 1000).toISOString(),
         ),
     ),
+  );
+
+  const seededVisits = [
+    {
+      ticketNumber: "01-482731",
+      organizationId: "org-northstar",
+      requesterName: "Jordan Lee · Customer NOC",
+      visitorName: "Marcus Reed",
+      visitorEmail: "marcus.reed@field-service.example",
+      visitorPhone: "+1 917 555 0142",
+      cageZoneId: "zone-cage-11000",
+      cabinets: ["CAB-11001", "CAB-11002"],
+      startsInMinutes: -30,
+      durationMinutes: 240,
+      comments: "Escort from the lobby to Cage 11000. Contact the Citadel NOC on arrival.",
+      hasDelivery: 1,
+      packageCount: 2,
+      packageDetails: "Two sealed replacement network switches.",
+    },
+    {
+      ticketNumber: "01-593204",
+      organizationId: "org-lumina",
+      requesterName: "Priya Shah · Customer NOC",
+      visitorName: "Daniel Cho",
+      visitorEmail: "daniel.cho@optics-lab.example",
+      visitorPhone: "+1 646 555 0188",
+      cageZoneId: "zone-cage-22000",
+      cabinets: ["CAB-22004"],
+      startsInMinutes: 24 * 60,
+      durationMinutes: 360,
+      comments: "Fiber inspection only. No equipment removal is authorized.",
+      hasDelivery: 0,
+      packageCount: 0,
+      packageDetails: "",
+    },
+    {
+      ticketNumber: "01-318845",
+      organizationId: "org-apex",
+      requesterName: "Morgan Chen · Customer operations",
+      visitorName: "Alicia Grant",
+      visitorEmail: "alicia.grant@secure-courier.example",
+      visitorPhone: "+1 347 555 0160",
+      cageZoneId: "zone-cage-11030",
+      cabinets: ["CAB-11031", "CAB-11032", "CAB-11035"],
+      startsInMinutes: -48 * 60,
+      durationMinutes: 480,
+      comments: "Completed supervised hardware delivery.",
+      hasDelivery: 1,
+      packageCount: 4,
+      packageDetails: "Four tamper-evident server cartons.",
+    },
+  ] as const;
+
+  await db.batch(
+    seededVisits.map((visit) => {
+      const validFrom = new Date(now.getTime() + visit.startsInMinutes * 60 * 1000);
+      const validUntil = new Date(validFrom.getTime() + visit.durationMinutes * 60 * 1000);
+      return db
+        .prepare(
+          `INSERT INTO scheduled_visits
+            (ticket_number, site_code, organization_id, requester_name, visitor_name,
+             visitor_email, visitor_phone, cage_zone_id, cabinet_access,
+             valid_from, valid_until, comments, has_delivery, package_count,
+             package_details, status)
+           VALUES (?, 'DC-01', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+           ON CONFLICT(ticket_number) DO UPDATE SET
+             organization_id = excluded.organization_id,
+             requester_name = excluded.requester_name,
+             visitor_name = excluded.visitor_name,
+             visitor_email = excluded.visitor_email,
+             visitor_phone = excluded.visitor_phone,
+             cage_zone_id = excluded.cage_zone_id,
+             cabinet_access = excluded.cabinet_access,
+             valid_from = excluded.valid_from,
+             valid_until = excluded.valid_until,
+             comments = excluded.comments,
+             has_delivery = excluded.has_delivery,
+             package_count = excluded.package_count,
+             package_details = excluded.package_details,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(
+          visit.ticketNumber,
+          visit.organizationId,
+          visit.requesterName,
+          visit.visitorName,
+          visit.visitorEmail,
+          visit.visitorPhone,
+          visit.cageZoneId,
+          JSON.stringify(visit.cabinets),
+          validFrom.toISOString(),
+          validUntil.toISOString(),
+          visit.comments,
+          visit.hasDelivery,
+          visit.packageCount,
+          visit.packageDetails,
+        );
+    }),
   );
 
   await db.prepare("PRAGMA optimize").run();

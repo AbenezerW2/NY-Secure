@@ -21,6 +21,9 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(initSource, /DOOR_HELD/);
   assert.match(initSource, /MONITORING_POINT_ALARM/);
   assert.match(consoleSource, /Filter by alarm type/);
+  assert.match(consoleSource, /Scheduled visits/);
+  assert.match(consoleSource, /01-XXXXXX/);
+  assert.match(consoleSource, /Customer cage/);
   assert.match(consoleSource, /hour12:\s*false/);
   assert.match(consoleSource, /Simulate access/);
   assert.match(consoleSource, /Search by first name, last name, OID, or company/);
@@ -67,11 +70,13 @@ test("ships durable access-control capabilities instead of starter artifacts", a
   assert.match(page, /<NySecureConsole \/>/);
   assert.match(consoleSource, /\/api\/people/);
   assert.match(consoleSource, /\/api\/simulate/);
+  assert.match(consoleSource, /\/api\/visits/);
   assert.doesNotMatch(consoleSource, /Manage access/);
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(schema, /accessAssignments/);
   assert.match(schema, /accessEvents/);
   assert.match(schema, /export const alarms/);
+  assert.match(schema, /export const scheduledVisits/);
   assert.match(schema, /phoneNumber:\s*text\("phone_number"\)/);
   assert.match(schema, /ibxAccessPin:\s*text\("ibx_access_pin"\)/);
   assert.match(schema, /creditHold:\s*integer\("credit_hold"/);

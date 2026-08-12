@@ -210,3 +210,38 @@ export const alarms = sqliteTable(
     index("idx_alarms_zone_occurred_at").on(table.zoneId, table.occurredAt),
   ],
 );
+
+export const scheduledVisits = sqliteTable(
+  "scheduled_visits",
+  {
+    ticketNumber: text("ticket_number").primaryKey(),
+    siteCode: text("site_code").notNull().default("DC-01"),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    requesterName: text("requester_name").notNull(),
+    visitorName: text("visitor_name").notNull(),
+    visitorEmail: text("visitor_email"),
+    visitorPhone: text("visitor_phone"),
+    cageZoneId: text("cage_zone_id")
+      .notNull()
+      .references(() => zones.id),
+    cabinetAccess: text("cabinet_access").notNull().default("[]"),
+    validFrom: text("valid_from").notNull(),
+    validUntil: text("valid_until").notNull(),
+    comments: text("comments").notNull().default(""),
+    hasDelivery: integer("has_delivery", { mode: "boolean" }).notNull().default(false),
+    packageCount: integer("package_count").notNull().default(0),
+    packageDetails: text("package_details").notNull().default(""),
+    status: text("status").notNull().default("SCHEDULED"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_scheduled_visits_valid_from").on(table.validFrom),
+    index("idx_scheduled_visits_organization_valid_from").on(
+      table.organizationId,
+      table.validFrom,
+    ),
+  ],
+);
