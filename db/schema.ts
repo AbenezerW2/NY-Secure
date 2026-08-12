@@ -186,3 +186,27 @@ export const accessEvents = sqliteTable(
     ),
   ],
 );
+
+export const alarms = sqliteTable(
+  "alarms",
+  {
+    id: text("id").primaryKey(),
+    alarmType: text("alarm_type").notNull(),
+    severity: text("severity").notNull().default("MEDIUM"),
+    personId: text("person_id").references(() => people.id),
+    actorLabel: text("actor_label").notNull().default("System"),
+    zoneId: text("zone_id")
+      .notNull()
+      .references(() => zones.id),
+    source: text("source").notNull().default("Access control"),
+    detail: text("detail").notNull().default(""),
+    status: text("status").notNull().default("ACTIVE"),
+    occurredAt: text("occurred_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_alarms_occurred_at").on(table.occurredAt),
+    index("idx_alarms_type_status").on(table.alarmType, table.status),
+    index("idx_alarms_zone_occurred_at").on(table.zoneId, table.occurredAt),
+  ],
+);
