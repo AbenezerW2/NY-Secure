@@ -610,6 +610,8 @@ const schemaStatements = [
     package_count INTEGER NOT NULL DEFAULT 0 CHECK (package_count >= 0),
     package_details TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'SCHEDULED' CHECK (status IN ('SCHEDULED', 'CANCELLED')),
+    signed_in_at TEXT,
+    signed_out_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (datetime(valid_until) > datetime(valid_from))
@@ -1078,6 +1080,14 @@ async function seedDatabase(db: D1Database) {
         );
     }),
   );
+  await db
+    .prepare(
+      `UPDATE scheduled_visits
+       SET signed_in_at = COALESCE(signed_in_at, ?), updated_at = CURRENT_TIMESTAMP
+       WHERE ticket_number = '01-482731' AND signed_out_at IS NULL`,
+    )
+    .bind(new Date(now.getTime() - 20 * 60 * 1000).toISOString())
+    .run();
 
   const seededCheckIns = [
     { id: "checkin-seed-eli", personId: "person-eli-mercer", source: "PORTAL", status: "ON_SITE", minutesAgo: 132, verifiedAfterMinutes: 4 },
@@ -1148,6 +1158,13 @@ export async function ensureDatabase() {
       }
       if (!organizationColumns.results.some((column) => column.name === "contact_phone")) {
         await db.prepare("ALTER TABLE organizations ADD COLUMN contact_phone TEXT NOT NULL DEFAULT ''").run();
+      }
+      const scheduledVisitColumns = await db.prepare("PRAGMA table_info(scheduled_visits)").all<{ name: string }>();
+      if (!scheduledVisitColumns.results.some((column) => column.name === "signed_in_at")) {
+        await db.prepare("ALTER TABLE scheduled_visits ADD COLUMN signed_in_at TEXT").run();
+      }
+      if (!scheduledVisitColumns.results.some((column) => column.name === "signed_out_at")) {
+        await db.prepare("ALTER TABLE scheduled_visits ADD COLUMN signed_out_at TEXT").run();
       }
       await seedDatabase(db);
       const missingPins = await db.prepare("SELECT id FROM people WHERE ibx_access_pin = '' ORDER BY created_at, id").all<{ id: string }>();

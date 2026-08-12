@@ -118,7 +118,9 @@ type ScheduledVisit = {
   hasDelivery: boolean;
   packageCount: number;
   packageDetails: string;
-  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  signedInAt?: string | null;
+  signedOutAt?: string | null;
+  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "OVERDUE";
 };
 
 type SiteCheckIn = {
@@ -494,7 +496,9 @@ function normalizeState(source: {
     hasDelivery: item.hasDelivery === true,
     packageCount: Number(item.packageCount ?? 0),
     packageDetails: String(item.packageDetails ?? ""),
-    status: (["SCHEDULED", "ACTIVE", "EXPIRED", "CANCELLED"].includes(String(item.status)) ? String(item.status) : "SCHEDULED") as ScheduledVisit["status"],
+    signedInAt: item.signedInAt ? String(item.signedInAt) : null,
+    signedOutAt: item.signedOutAt ? String(item.signedOutAt) : null,
+    status: (["SCHEDULED", "ACTIVE", "EXPIRED", "CANCELLED", "OVERDUE"].includes(String(item.status)) ? String(item.status) : "SCHEDULED") as ScheduledVisit["status"],
   }));
   const checkIns: SiteCheckIn[] = (source.checkIns ?? []).map((item) => ({
     id: String(item.id),
@@ -1627,41 +1631,74 @@ function FacilityView({ zones, selectedZone, selectedZoneId, setSelectedZoneId }
 function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
-  const filteredVisits = visits.filter((visit) => {
+  const [columnFilters, setColumnFilters] = useState({ ticket: "", visitor: "", customer: "", access: "", window: "", delivery: "", status: "" });
+  const [visitClock, setVisitClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setVisitClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const isSignedIn = (visit: ScheduledVisit) => Boolean(visit.signedInAt && !visit.signedOutAt);
+  const isExpired = (visit: ScheduledVisit) => new Date(visit.validUntil).getTime() < visitClock;
+  const effectiveVisitStatus = (visit: ScheduledVisit): ScheduledVisit["status"] => isExpired(visit) && isSignedIn(visit) ? "OVERDUE" : isExpired(visit) ? "EXPIRED" : visit.status;
+  const visibleVisits = visits.filter((visit) => !isExpired(visit) || isSignedIn(visit));
+  const filteredVisits = visibleVisits.filter((visit) => {
+    const effectiveStatus = effectiveVisitStatus(visit);
     const matchesSearch = wildcardMatchAny([visit.ticketNumber, visit.visitorName, visit.organizationName, visit.requesterName, visit.cageName, visit.cabinetAccess.join(" "), visit.comments, visit.packageDetails], search);
-    return matchesSearch && (status === "ALL" || visit.status === status);
+    const deliveryLabel = visit.hasDelivery ? `${visit.packageCount} package${visit.packageCount === 1 ? "" : "s"} ${visit.packageDetails}` : "None";
+    const validWindow = `${formatDate(visit.validFrom)} ${formatTime(visit.validFrom)} ${formatDate(visit.validUntil)} ${formatTime(visit.validUntil)}`;
+    return matchesSearch &&
+      (status === "ALL" || effectiveStatus === status) &&
+      wildcardMatchAny([visit.ticketNumber, visit.siteCode, visit.comments], columnFilters.ticket) &&
+      wildcardMatchAny([visit.visitorName, visit.visitorEmail, visit.visitorPhone], columnFilters.visitor) &&
+      wildcardMatchAny([visit.organizationName, visit.requesterName], columnFilters.customer) &&
+      wildcardMatchAny([visit.cageName, visit.cabinetAccess.join(" ")], columnFilters.access) &&
+      wildcardMatch(validWindow, columnFilters.window) &&
+      wildcardMatch(deliveryLabel, columnFilters.delivery) &&
+      wildcardMatch(label(effectiveStatus), columnFilters.status);
   });
-  const scheduledCount = visits.filter((visit) => visit.status === "SCHEDULED").length;
-  const activeCount = visits.filter((visit) => visit.status === "ACTIVE").length;
-  const deliveryCount = visits.filter((visit) => visit.hasDelivery && visit.status !== "EXPIRED" && visit.status !== "CANCELLED").length;
+  const scheduledCount = visibleVisits.filter((visit) => effectiveVisitStatus(visit) === "SCHEDULED").length;
+  const activeCount = visibleVisits.filter(isSignedIn).length;
+  const deliveryCount = visibleVisits.filter((visit) => visit.hasDelivery && visit.status !== "CANCELLED").length;
+  const setColumnFilter = (column: keyof typeof columnFilters, value: string) => setColumnFilters((current) => ({ ...current, [column]: value }));
 
   return (
     <div className="visits-workspace">
       <div className="visit-summary-grid">
         <article className="panel visit-summary-card"><span>Upcoming</span><strong>{scheduledCount}</strong><small>Scheduled visit tickets</small></article>
-        <article className="panel visit-summary-card active"><span>On site now</span><strong>{activeCount}</strong><small>Tickets in their valid window</small></article>
+        <article className="panel visit-summary-card active"><span>On site now</span><strong>{activeCount}</strong><small>Security-signed-in visitors</small></article>
         <article className="panel visit-summary-card delivery"><span>Deliveries</span><strong>{deliveryCount}</strong><small>Upcoming package arrivals</small></article>
       </div>
       <section className="panel directory-panel visits-panel">
         <div className="directory-toolbar activity-toolbar visits-toolbar">
           <label className="table-search"><span>⌕</span><input aria-label="Search scheduled visits" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visits… Try 01-*" title="Use * to match any characters" /></label>
           <div className="toolbar-filters visit-filters">
-            <select aria-label="Filter visits by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="EXPIRED">Expired</option><option value="CANCELLED">Cancelled</option></select>
+            <select aria-label="Filter visits by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="OVERDUE">Signed in · overdue</option><option value="CANCELLED">Cancelled</option></select>
           </div>
           <span className="result-count">{filteredVisits.length} tickets</span>
         </div>
         <div className="table-wrap">
           <table className="data-table visits-table">
-            <thead><tr><th>Ticket</th><th>Visitor</th><th>Customer / requester</th><th>Cage & cabinets</th><th>Valid window</th><th>Delivery</th><th>Status</th></tr></thead>
-            <tbody>{filteredVisits.map((visit) => <tr key={visit.ticketNumber}>
-              <td><strong className="ticket-number">{visit.ticketNumber}</strong><small>{visit.siteCode}</small>{visit.comments && <small title={visit.comments}>Comment added</small>}</td>
-              <td><strong>{visit.visitorName}</strong><small>{visit.visitorEmail || visit.visitorPhone || "Contact not provided"}</small></td>
-              <td><strong>{visit.organizationName}</strong><small>{visit.requesterName}</small></td>
-              <td><strong>{visit.cageName}</strong><div className="cabinet-tags">{visit.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</div></td>
-              <td><strong>{formatDate(visit.validFrom)} · {formatTime(visit.validFrom)}</strong><small>Until {formatDate(visit.validUntil)} · {formatTime(visit.validUntil)}</small></td>
-              <td>{visit.hasDelivery ? <><strong>{visit.packageCount} package{visit.packageCount === 1 ? "" : "s"}</strong><small>{visit.packageDetails || "Package delivery"}</small></> : <span className="no-delivery">None</span>}</td>
-              <td><span className={`visit-status ${visit.status.toLowerCase()}`}><i />{label(visit.status)}</span></td>
-            </tr>)}</tbody>
+            <thead><tr>
+              <th><span>Ticket</span><input aria-label="Filter Ticket column" onChange={(event) => setColumnFilter("ticket", event.target.value)} placeholder="01-*" title="Use * to match any characters" value={columnFilters.ticket} /></th>
+              <th><span>Visitor</span><input aria-label="Filter Visitor column" onChange={(event) => setColumnFilter("visitor", event.target.value)} placeholder="Name or email" title="Use * to match any characters" value={columnFilters.visitor} /></th>
+              <th><span>Customer / requester</span><input aria-label="Filter Customer or requester column" onChange={(event) => setColumnFilter("customer", event.target.value)} placeholder="Customer or NOC" title="Use * to match any characters" value={columnFilters.customer} /></th>
+              <th><span>Cage & cabinets</span><input aria-label="Filter Cage and cabinets column" onChange={(event) => setColumnFilter("access", event.target.value)} placeholder="Cage or cabinet" title="Use * to match any characters" value={columnFilters.access} /></th>
+              <th><span>Valid window</span><input aria-label="Filter Valid window column" onChange={(event) => setColumnFilter("window", event.target.value)} placeholder="Date or time" title="Use * to match any characters" value={columnFilters.window} /></th>
+              <th><span>Delivery</span><input aria-label="Filter Delivery column" onChange={(event) => setColumnFilter("delivery", event.target.value)} placeholder="Package or None" title="Use * to match any characters" value={columnFilters.delivery} /></th>
+              <th><span>Status</span><input aria-label="Filter Status column" onChange={(event) => setColumnFilter("status", event.target.value)} placeholder="Status" title="Use * to match any characters" value={columnFilters.status} /></th>
+            </tr></thead>
+            <tbody>{filteredVisits.map((visit) => {
+              const effectiveStatus = effectiveVisitStatus(visit);
+              return <tr className={effectiveStatus === "OVERDUE" ? "overdue-visit" : undefined} key={visit.ticketNumber}>
+                <td><strong className="ticket-number">{visit.ticketNumber}</strong><small>{visit.siteCode}</small>{visit.comments && <small title={visit.comments}>Comment added</small>}</td>
+                <td><strong>{visit.visitorName}</strong><small>{visit.visitorEmail || visit.visitorPhone || "Contact not provided"}</small></td>
+                <td><strong>{visit.organizationName}</strong><small>{visit.requesterName}</small></td>
+                <td><strong>{visit.cageName}</strong><div className="cabinet-tags">{visit.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</div></td>
+                <td><strong>{formatDate(visit.validFrom)} · {formatTime(visit.validFrom)}</strong><small>Until {formatDate(visit.validUntil)} · {formatTime(visit.validUntil)}</small></td>
+                <td>{visit.hasDelivery ? <><strong>{visit.packageCount} package{visit.packageCount === 1 ? "" : "s"}</strong><small>{visit.packageDetails || "Package delivery"}</small></> : <span className="no-delivery">None</span>}</td>
+                <td><span className={`visit-status ${effectiveStatus.toLowerCase()}`}><i />{effectiveStatus === "OVERDUE" ? "Signed in · overdue" : label(effectiveStatus)}</span>{isSignedIn(visit) && <small>Signed in {formatTime(visit.signedInAt!)}</small>}</td>
+              </tr>;
+            })}</tbody>
           </table>
           {filteredVisits.length === 0 && <div className="activity-empty"><strong>No matching visit tickets</strong><span>Try another search or status filter.</span></div>}
         </div>

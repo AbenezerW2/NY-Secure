@@ -34,6 +34,16 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Scheduled visits/);
   assert.match(consoleSource, /01-XXXXXX/);
   assert.match(consoleSource, /Customer cage/);
+  assert.match(consoleSource, /Filter Ticket column/);
+  assert.match(consoleSource, /Filter Visitor column/);
+  assert.match(consoleSource, /Filter Customer or requester column/);
+  assert.match(consoleSource, /Filter Cage and cabinets column/);
+  assert.match(consoleSource, /Filter Valid window column/);
+  assert.match(consoleSource, /Filter Delivery column/);
+  assert.match(consoleSource, /Filter Status column/);
+  assert.match(consoleSource, /Signed in · overdue/);
+  assert.match(consoleSource, /effectiveVisitStatus/);
+  assert.match(consoleSource, /setInterval\(\(\) => setVisitClock\(Date\.now\(\)\), 1000\)/);
   assert.match(consoleSource, /hour12:\s*false/);
   assert.match(consoleSource, /Simulate access/);
   assert.match(consoleSource, /Search by first name, last name, OID, or company/);
@@ -99,6 +109,7 @@ test("ships durable access-control capabilities instead of starter artifacts", a
   assert.match(schema, /accessEvents/);
   assert.match(schema, /export const alarms/);
   assert.match(schema, /export const scheduledVisits/);
+  assert.match(schema, /signedInAt:\s*text\("signed_in_at"\)/);
   assert.match(schema, /export const siteCheckIns/);
   assert.match(schema, /idx_site_check_ins_person_open/);
   assert.match(schema, /phoneNumber:\s*text\("phone_number"\)/);
