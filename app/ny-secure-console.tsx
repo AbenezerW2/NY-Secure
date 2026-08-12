@@ -130,10 +130,11 @@ type SiteCheckIn = {
   relationshipType: string;
   badgeNumber: string;
   source: "PORTAL" | "KIOSK";
-  status: "PENDING" | "ON_SITE";
+  status: "PENDING" | "ON_SITE" | "SIGNED_OUT";
   requestedAt: string;
   verifiedAt?: string | null;
   verifiedBy?: string | null;
+  signedOutAt?: string | null;
   notes: string;
   lastScanAt?: string | null;
   lastScanZone?: string | null;
@@ -314,6 +315,16 @@ function relativeEventTime(value: string) {
   return `${hours}h ago`;
 }
 
+function formatOnSiteDuration(signedInAt?: string | null, signedOutAt?: string | null) {
+  if (!signedInAt || !signedOutAt) return "Unavailable";
+  const minutes = Math.max(0, Math.round((new Date(signedOutAt).getTime() - new Date(signedInAt).getTime()) / 60000));
+  if (!Number.isFinite(minutes)) return "Unavailable";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours === 0) return `${remainingMinutes}m`;
+  return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ""}`;
+}
+
 function normalizeState(source: {
   organizations?: Array<Record<string, unknown>>;
   zones?: Array<Record<string, unknown>>;
@@ -478,10 +489,11 @@ function normalizeState(source: {
     relationshipType: String(item.relationshipType ?? "VISITOR"),
     badgeNumber: String(item.badgeNumber ?? "UNISSUED"),
     source: String(item.source) === "PORTAL" ? "PORTAL" : "KIOSK",
-    status: String(item.status) === "ON_SITE" ? "ON_SITE" : "PENDING",
+    status: String(item.status) === "ON_SITE" ? "ON_SITE" : String(item.status) === "SIGNED_OUT" ? "SIGNED_OUT" : "PENDING",
     requestedAt: String(item.requestedAt),
     verifiedAt: item.verifiedAt ? String(item.verifiedAt) : null,
     verifiedBy: item.verifiedBy ? String(item.verifiedBy) : null,
+    signedOutAt: item.signedOutAt ? String(item.signedOutAt) : null,
     notes: String(item.notes ?? ""),
     lastScanAt: item.lastScanAt ? String(item.lastScanAt) : null,
     lastScanZone: item.lastScanZone ? String(item.lastScanZone) : null,
@@ -1324,6 +1336,9 @@ function PeopleView({
   const [checkInError, setCheckInError] = useState("");
   const onSite = checkIns.filter((checkIn) => checkIn.status === "ON_SITE");
   const pending = checkIns.filter((checkIn) => checkIn.status === "PENDING");
+  const history = checkIns
+    .filter((checkIn) => checkIn.status === "SIGNED_OUT" && checkIn.verifiedAt && checkIn.signedOutAt)
+    .sort((a, b) => new Date(b.signedOutAt!).getTime() - new Date(a.signedOutAt!).getTime());
   const canSearch = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
   const filteredPeople = useMemo(() => {
     if (!submittedSearch) return [];
@@ -1383,6 +1398,7 @@ function PeopleView({
       <nav className="people-workspace-tabs" aria-label="Open People tabs">
         <button className={activePeopleTab === "onsite" ? "active" : ""} onClick={() => setActivePeopleTab("onsite")} type="button"><span aria-hidden="true">●</span> On-site <b>{onSite.length}</b></button>
         <button className={activePeopleTab === "pending" ? "active" : ""} onClick={() => setActivePeopleTab("pending")} type="button"><span aria-hidden="true">◷</span> Pending <b>{pending.length}</b></button>
+        <button className={activePeopleTab === "history" ? "active" : ""} onClick={() => setActivePeopleTab("history")} type="button"><span aria-hidden="true">↶</span> History <b>{history.length}</b></button>
         <button className={activePeopleTab === "search" ? "active" : ""} onClick={() => setActivePeopleTab("search")} type="button"><span aria-hidden="true">⌕</span> Directory</button>
         {submittedSearch && <div className={activePeopleTab === "results" ? "people-tab-shell active" : "people-tab-shell"}><button className="person-tab results-tab" onClick={() => setActivePeopleTab("results")} type="button"><span aria-hidden="true">⌗</span> Search results</button><button className="close-people-tab" aria-label="Close search results" onClick={() => { setSubmittedSearch(null); if (activePeopleTab === "results") setActivePeopleTab("search"); }} type="button">×</button></div>}
         {openPeople.map((person) => <div className={activePeopleTab === person.id ? "people-tab-shell active" : "people-tab-shell"} key={person.id}><button className="person-tab" onClick={() => setActivePeopleTab(person.id)} type="button"><span className="mini-contact-photo" aria-hidden="true"><i /></span>{person.firstName} {person.lastName}</button><button className="close-people-tab" aria-label={`Close ${person.firstName} ${person.lastName} profile`} onClick={() => closeProfile(person.id)} type="button">×</button></div>)}
@@ -1404,6 +1420,17 @@ function PeopleView({
         <div className="pending-credential"><span>Badge</span><code>{checkIn.badgeNumber}</code></div>
         <div className="pending-actions"><button className="secondary-button reject-checkin" disabled={checkInAction !== null} onClick={() => updateCheckIn(checkIn.id, "REJECT")} type="button">Reject</button><button className="primary-button" disabled={checkInAction !== null} onClick={() => updateCheckIn(checkIn.id, "VERIFY")} type="button">{checkInAction === `${checkIn.id}-VERIFY` ? "Verifying…" : "Verify & sign in"}</button></div>
       </article>)}</div> : <div className="presence-empty"><span>✓</span><h3>No pending sign-ins</h3><p>New portal and kiosk arrivals will wait here for security.</p></div>}
+    </section>}
+    {activePeopleTab === "history" && <section className="panel people-presence-panel checkin-history-panel">
+      <header className="presence-header"><div><p className="eyebrow">Completed on-site visits</p><h2>Sign-in history</h2><p>A durable record of when security admitted each person, when they left, and their total time on-site.</p></div><span className="presence-total history"><strong>{history.length}</strong><small>Completed</small></span></header>
+      <div className="table-wrap"><table className="data-table checkin-history-table"><thead><tr><th>Person</th><th>Customer</th><th>Signed in</th><th>Signed out</th><th>Time on-site</th><th>Verification</th></tr></thead><tbody>{history.map((checkIn) => <tr key={checkIn.id}>
+        <td><strong>{checkIn.personName}</strong><small>{label(checkIn.relationshipType)} · <code>{checkIn.badgeNumber}</code></small></td>
+        <td><strong>{checkIn.organizationName}</strong><small>{label(checkIn.source)} arrival</small></td>
+        <td><strong>{formatDate(checkIn.verifiedAt)} · {formatTime(checkIn.verifiedAt!)}</strong><small>Requested {formatTime(checkIn.requestedAt)}</small></td>
+        <td><strong>{formatDate(checkIn.signedOutAt)} · {formatTime(checkIn.signedOutAt!)}</strong><small>{relativeEventTime(checkIn.signedOutAt!)}</small></td>
+        <td><span className="time-on-site">{formatOnSiteDuration(checkIn.verifiedAt, checkIn.signedOutAt)}</span></td>
+        <td><strong>{checkIn.verifiedBy || "Security"}</strong><small>Identity verified</small></td>
+      </tr>)}</tbody></table>{history.length === 0 && <div className="presence-empty"><span>↶</span><h3>No completed sign-ins yet</h3><p>Signed-out visits will appear here with their total time on-site.</p></div>}</div>
     </section>}
     {activePeopleTab === "search" && <section className="panel directory-panel people-directory">
       <div className="people-search-header">

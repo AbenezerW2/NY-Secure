@@ -302,9 +302,10 @@ export async function getState(db: D1Database) {
          FROM site_check_ins c
          JOIN people p ON p.id = c.person_id
          JOIN organizations o ON o.id = p.organization_id
-         WHERE c.status IN ('PENDING', 'ON_SITE')
+         WHERE c.status IN ('PENDING', 'ON_SITE', 'SIGNED_OUT')
          ORDER BY CASE c.status WHEN 'PENDING' THEN 0 ELSE 1 END,
-           c.requested_at DESC`,
+           c.requested_at DESC
+         LIMIT 250`,
       )
       .all<SiteCheckInRow>(),
     db

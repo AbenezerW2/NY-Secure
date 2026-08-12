@@ -49,6 +49,9 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /People currently on-site/);
   assert.match(consoleSource, /Pending security verification/);
   assert.match(consoleSource, /Verify & sign in/);
+  assert.match(consoleSource, /Sign-in history/);
+  assert.match(consoleSource, /Time on-site/);
+  assert.match(consoleSource, /formatOnSiteDuration/);
   assert.match(consoleSource, /\/api\/check-ins/);
   assert.match(consoleSource, /people-workspace-tabs/);
   assert.match(consoleSource, /Directory search/);

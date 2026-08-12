@@ -913,6 +913,7 @@ select:focus-visible {
 .presence-header > div > p:last-child { margin: 6px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
 .presence-total { display: grid; min-width: 88px; gap: 3px; padding: 11px 14px; color: #167b5b; background: #e9f6f1; border: 1px solid #d0eadf; border-radius: 9px; text-align: center; }
 .presence-total.pending { color: #a2611f; background: #fff4e4; border-color: #f1dfc3; }
+.presence-total.history { color: #4c5f91; background: #eef1fa; border-color: #dce2f2; }
 .presence-total strong { font-size: calc(19px * var(--font-scale)); line-height: 1; }
 .presence-total small { font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
 .presence-card-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; padding: 20px; }
@@ -951,6 +952,18 @@ select:focus-visible {
 .pending-actions { display: flex; justify-content: flex-end; gap: 7px; }
 .pending-actions button { white-space: nowrap; }
 .reject-checkin { color: var(--red); }
+.checkin-history-table { min-width: 1080px; table-layout: fixed; }
+.checkin-history-table th:nth-child(1) { width: 17%; }
+.checkin-history-table th:nth-child(2) { width: 18%; }
+.checkin-history-table th:nth-child(3) { width: 19%; }
+.checkin-history-table th:nth-child(4) { width: 19%; }
+.checkin-history-table th:nth-child(5) { width: 12%; }
+.checkin-history-table th:nth-child(6) { width: 15%; }
+.checkin-history-table td { vertical-align: middle; }
+.checkin-history-table td > strong, .checkin-history-table td > small { display: block; }
+.checkin-history-table td > small { margin-top: 4px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); }
+.checkin-history-table code { font-family: var(--font-geist-mono), monospace; }
+.time-on-site { display: inline-flex; min-width: 68px; justify-content: center; padding: 6px 9px; color: #28675b; background: #e8f5f1; border: 1px solid #d1e8e1; border-radius: 7px; font-family: var(--font-geist-mono), monospace; font-size: calc(9px * var(--font-scale)); font-weight: 800; }
 .people-tab-shell { display: flex; min-height: 39px; align-items: stretch; background: #e9eef2; border: 1px solid #d8e1e6; border-bottom: 0; border-radius: 8px 8px 0 0; overflow: hidden; }
 .people-tab-shell.active { background: #fff; }
 .person-tab { display: flex; align-items: center; gap: 7px; padding: 0 7px 0 11px; color: #61757c; background: transparent; border: 0; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
@@ -1750,6 +1763,8 @@ select:focus-visible {
 .app-shell[data-theme="dark"] :is(.presence-card dd, .pending-credential code) { color: var(--ink); }
 .app-shell[data-theme="dark"] .presence-total { color: #8ed6bd; background: #11362e; border-color: #225a4c; }
 .app-shell[data-theme="dark"] .presence-total.pending { color: #f2c078; background: #3b2b15; border-color: #6a4b20; }
+.app-shell[data-theme="dark"] .presence-total.history { color: #b7c7f5; background: #202d51; border-color: #35466f; }
+.app-shell[data-theme="dark"] .time-on-site { color: #8ed6bd; background: #11362e; border-color: #225a4c; }
 .app-shell[data-theme="dark"] .contact-results-panel > header { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.contact-results-panel > header h2, .contact-card-name strong) { color: var(--ink); }
 .app-shell[data-theme="dark"] .person-contact-card { background: #132238; border-color: var(--line); }
@@ -1891,6 +1906,18 @@ select:focus-visible {
   .pending-person, .pending-actions { grid-column: 1 / -1; }
   .pending-actions { justify-content: stretch; }
   .pending-actions button { flex: 1; }
+  .checkin-history-table { min-width: 0; }
+  .checkin-history-table thead { display: none; }
+  .checkin-history-table, .checkin-history-table tbody, .checkin-history-table tr, .checkin-history-table td { display: block; width: 100%; }
+  .checkin-history-table tr { padding: 14px 17px; border-bottom: 1px solid var(--line); }
+  .checkin-history-table td { display: grid; grid-template-columns: 95px minmax(0, 1fr); min-width: 0; gap: 9px; padding: 6px 0; border: 0; overflow-wrap: anywhere; }
+  .checkin-history-table td::before { color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 730; letter-spacing: .07em; text-transform: uppercase; }
+  .checkin-history-table td:nth-child(1)::before { content: "Person"; }
+  .checkin-history-table td:nth-child(2)::before { content: "Customer"; }
+  .checkin-history-table td:nth-child(3)::before { content: "Signed in"; }
+  .checkin-history-table td:nth-child(4)::before { content: "Signed out"; }
+  .checkin-history-table td:nth-child(5)::before { content: "Time on-site"; }
+  .checkin-history-table td:nth-child(6)::before { content: "Verified by"; }
   .locator-search-panel { padding: 18px; }
   .locator-form { grid-template-columns: 1fr; }
   .locator-form .primary-button { width: 100%; }

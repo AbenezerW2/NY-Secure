@@ -1110,6 +1110,20 @@ async function seedDatabase(db: D1Database) {
     }),
   );
 
+  const previousRequestedAt = new Date(now.getTime() - 31 * 60 * 60 * 1000);
+  const previousVerifiedAt = new Date(previousRequestedAt.getTime() + 5 * 60 * 1000);
+  const previousSignedOutAt = new Date(previousVerifiedAt.getTime() + 4.5 * 60 * 60 * 1000);
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO site_check_ins
+        (id, person_id, source, status, requested_at, verified_at,
+         verified_by, signed_out_at, notes)
+       VALUES ('checkin-history-eli-001', 'person-eli-mercer', 'PORTAL',
+         'SIGNED_OUT', ?, ?, 'Maya Brooks', ?, 'Completed customer maintenance visit.')`,
+    )
+    .bind(previousRequestedAt.toISOString(), previousVerifiedAt.toISOString(), previousSignedOutAt.toISOString())
+    .run();
+
   await db.prepare("PRAGMA optimize").run();
 }
 
