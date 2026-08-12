@@ -11,6 +11,7 @@ type View =
   | "policies"
   | "facility"
   | "visits"
+  | "locator"
   | "alarms"
   | "activity";
 
@@ -173,6 +174,7 @@ const NAV_GROUPS: { label: string; items: { id: View; label: string; symbol: str
   {
     label: "Alarm center",
     items: [
+      { id: "locator", label: "Locator", symbol: "LO" },
       { id: "alarms", label: "Alarms", symbol: "AR" },
       { id: "activity", label: "Activity log", symbol: "AL" },
     ],
@@ -232,6 +234,11 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; subtitle: string
     eyebrow: "Temporary access",
     title: "Scheduled visits",
     subtitle: "Create time-bound work-visit tickets for customer and NOC-sponsored visitors.",
+  },
+  locator: {
+    eyebrow: "Last-known access point",
+    title: "Locator",
+    subtitle: "Find a person’s latest scan or build a 48-hour last-seen roster from the activity log.",
   },
   alarms: {
     eyebrow: "Security exceptions",
@@ -768,7 +775,7 @@ export default function NySecureConsole() {
                   <span>＋</span> Create visit ticket
                 </button>
               )}
-              {activeView !== "people" && activeView !== "operations" && activeView !== "visits" && (
+              {activeView !== "people" && activeView !== "operations" && activeView !== "visits" && activeView !== "locator" && (
                 <button className="primary-button" onClick={() => setActiveView("operations")} type="button">
                   <span className="button-reader-icon" /> Simulate access
                 </button>
@@ -836,6 +843,7 @@ export default function NySecureConsole() {
                 />
               )}
               {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} />}
+              {activeView === "locator" && <LocatorView events={data.events} people={data.people} orgMap={orgMap} />}
               {activeView === "alarms" && (
                 <AlarmsView
                   alarms={data.alarms}
@@ -1501,6 +1509,91 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
           {filteredVisits.length === 0 && <div className="activity-empty"><strong>No matching visit tickets</strong><span>Try another search or status filter.</span></div>}
         </div>
       </section>
+    </div>
+  );
+}
+
+function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people: Person[]; orgMap: Map<string, Organization> }) {
+  const [query, setQuery] = useState("");
+  const [searchRequest, setSearchRequest] = useState<{ query: string; requestedAt: number } | null>(null);
+  const peopleMap = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
+  const results = useMemo(() => {
+    if (!searchRequest) return [];
+    const needle = searchRequest.query.toLowerCase();
+    const cutoff = searchRequest.requestedAt - 48 * 60 * 60 * 1000;
+    const latestByPerson = new Map<string, AccessEvent>();
+
+    for (const event of events) {
+      const occurredAt = new Date(event.occurredAt).getTime();
+      if (!Number.isFinite(occurredAt) || occurredAt > searchRequest.requestedAt) continue;
+      if (!needle && occurredAt < cutoff) continue;
+
+      const person = peopleMap.get(event.personId);
+      const organization = person ? orgMap.get(person.organizationId) : undefined;
+      const searchable = [
+        event.personName,
+        event.organizationName,
+        person?.firstName,
+        person?.lastName,
+        person ? `${person.firstName} ${person.lastName}` : "",
+        person?.email,
+        person?.badgeId,
+        person?.organizationName,
+        organization?.name,
+        organization?.oid,
+      ].join(" ").toLowerCase();
+      if (needle && !searchable.includes(needle)) continue;
+
+      const key = event.personId || event.personName || String(event.id);
+      const current = latestByPerson.get(key);
+      if (!current || occurredAt > new Date(current.occurredAt).getTime()) latestByPerson.set(key, event);
+    }
+
+    return Array.from(latestByPerson.values())
+      .map((event) => {
+        const person = peopleMap.get(event.personId);
+        return { event, person, organization: person ? orgMap.get(person.organizationId) : undefined };
+      })
+      .sort((a, b) => new Date(b.event.occurredAt).getTime() - new Date(a.event.occurredAt).getTime());
+  }, [events, orgMap, peopleMap, searchRequest]);
+  const grantedCount = results.filter(({ event }) => event.decision === "GRANTED").length;
+  const locationCount = new Set(results.map(({ event }) => event.zoneName || event.zoneId)).size;
+
+  function locate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearchRequest({ query: query.trim(), requestedAt: Date.now() });
+  }
+
+  return (
+    <div className="locator-layout">
+      <section className="panel locator-search-panel">
+        <div className="locator-search-copy"><span className="locator-mark" aria-hidden="true">⌖</span><div><p className="eyebrow">Activity-log lookup</p><h2>Find a last-known scan</h2><p>Enter a person, badge, company, or OID to search the complete log. Leave the field empty to locate everyone who scanned during the past 48 hours.</p></div></div>
+        <form className="locator-form" onSubmit={locate}>
+          <label><span>Person or customer record</span><div><i aria-hidden="true">⌕</i><input aria-label="Search locator by person, badge, company, or OID" onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Amara Okafor, badge, company, or OID" value={query} /></div></label>
+          <button className="primary-button" type="submit"><span aria-hidden="true">⌖</span>{query.trim() ? "Locate person" : "Locate everyone"}</button>
+        </form>
+        <div className="locator-mode-note"><span>48h</span><p><strong>Empty-search mode</strong> scans the activity log and returns each person’s single most recent location within the last 48 hours.</p></div>
+      </section>
+
+      {!searchRequest && <section className="panel locator-waiting"><span aria-hidden="true">⌖</span><h2>Ready to locate</h2><p>Search for one person or submit the empty field for the 48-hour roster.</p></section>}
+
+      {searchRequest && <section className="locator-results">
+        <div className="locator-summary-grid">
+          <article className="panel"><span>People located</span><strong>{results.length}</strong><small>{searchRequest.query ? "Matching the entered search" : "With a scan in the last 48 hours"}</small></article>
+          <article className="panel"><span>Last scan granted</span><strong>{grantedCount}</strong><small>Latest successful access decisions</small></article>
+          <article className="panel"><span>Locations represented</span><strong>{locationCount}</strong><small>Unique last-known access points</small></article>
+        </div>
+        <section className="panel directory-panel locator-results-panel">
+          <header><div><p className="eyebrow">{searchRequest.query ? "Complete log search" : "Past 48 hours"}</p><h2>{searchRequest.query ? `Latest scan matching “${searchRequest.query}”` : "Everyone’s latest scan"}</h2><p>One most-recent activity-log result per person.</p></div><span className="result-count">{results.length} {results.length === 1 ? "person" : "people"}</span></header>
+          <div className="table-wrap"><table className="data-table locator-table"><thead><tr><th>Who</th><th>Customer</th><th>Last location</th><th>Decision</th><th>Last scan</th></tr></thead><tbody>{results.map(({ event, person, organization }) => <tr key={event.personId || event.id}>
+            <td><strong>{person ? `${person.firstName} ${person.lastName}` : event.personName || "Unknown credential"}</strong><small>{person?.badgeId || "No linked badge"}</small></td>
+            <td><strong>{organization?.name || person?.organizationName || event.organizationName || "Unassigned"}</strong><small>{organization?.oid || "No OID"}</small></td>
+            <td><strong>{event.zoneName || event.zoneId}</strong><small>Entry reader</small></td>
+            <td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{label(event.reasonCode)}</small></td>
+            <td><strong>{formatDate(event.occurredAt)} · {formatTime(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td>
+          </tr>)}</tbody></table>{results.length === 0 && <div className="activity-empty"><strong>No matching scans found</strong><span>{searchRequest.query ? "Try a different name, badge, company, or OID." : "No one has a recorded scan in the past 48 hours."}</span></div>}</div>
+        </section>
+      </section>}
     </div>
   );
 }
