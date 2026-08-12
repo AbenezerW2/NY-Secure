@@ -614,6 +614,19 @@ const schemaStatements = [
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK (datetime(valid_until) > datetime(valid_from))
   )`,
+  `CREATE TABLE IF NOT EXISTS site_check_ins (
+    id TEXT PRIMARY KEY NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id),
+    source TEXT NOT NULL DEFAULT 'KIOSK' CHECK (source IN ('PORTAL', 'KIOSK')),
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ON_SITE', 'SIGNED_OUT', 'REJECTED')),
+    requested_at TEXT NOT NULL,
+    verified_at TEXT,
+    verified_by TEXT,
+    signed_out_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   "CREATE INDEX IF NOT EXISTS idx_zones_category_active ON zones(category, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_organization_active ON people(organization_id, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_relationship_type ON people(relationship_type)",
@@ -630,6 +643,9 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS idx_alarms_zone_occurred_at ON alarms(zone_id, occurred_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_valid_from ON scheduled_visits(valid_from DESC)",
   "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_organization_valid_from ON scheduled_visits(organization_id, valid_from DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_site_check_ins_status_requested_at ON site_check_ins(status, requested_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_site_check_ins_person_requested_at ON site_check_ins(person_id, requested_at DESC)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_site_check_ins_person_open ON site_check_ins(person_id) WHERE status IN ('PENDING', 'ON_SITE')",
 ];
 
 let initializationPromise: Promise<void> | undefined;
@@ -1059,6 +1075,37 @@ async function seedDatabase(db: D1Database) {
           visit.hasDelivery,
           visit.packageCount,
           visit.packageDetails,
+        );
+    }),
+  );
+
+  const seededCheckIns = [
+    { id: "checkin-seed-eli", personId: "person-eli-mercer", source: "PORTAL", status: "ON_SITE", minutesAgo: 132, verifiedAfterMinutes: 4 },
+    { id: "checkin-seed-sofia", personId: "person-sofia-reyes", source: "KIOSK", status: "ON_SITE", minutesAgo: 86, verifiedAfterMinutes: 3 },
+    { id: "checkin-seed-noah", personId: "person-noah-patel", source: "KIOSK", status: "ON_SITE", minutesAgo: 41, verifiedAfterMinutes: 2 },
+    { id: "checkin-seed-lena", personId: "person-lena-park", source: "PORTAL", status: "PENDING", minutesAgo: 11, verifiedAfterMinutes: null },
+  ] as const;
+
+  await db.batch(
+    seededCheckIns.map((checkIn) => {
+      const requestedAt = new Date(now.getTime() - checkIn.minutesAgo * 60 * 1000);
+      const verifiedAt = checkIn.verifiedAfterMinutes === null
+        ? null
+        : new Date(requestedAt.getTime() + checkIn.verifiedAfterMinutes * 60 * 1000).toISOString();
+      return db
+        .prepare(
+          `INSERT OR IGNORE INTO site_check_ins
+            (id, person_id, source, status, requested_at, verified_at, verified_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          checkIn.id,
+          checkIn.personId,
+          checkIn.source,
+          checkIn.status,
+          requestedAt.toISOString(),
+          verifiedAt,
+          verifiedAt ? "Maya Brooks" : null,
         );
     }),
   );

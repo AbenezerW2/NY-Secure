@@ -36,6 +36,20 @@
       "when": 1786520763463,
       "tag": "0004_cloudy_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786522122813,
+      "tag": "0005_cultured_zzzax",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786522137283,
+      "tag": "0006_short_skullbuster",
+      "breakpoints": true
     }
   ]
 }

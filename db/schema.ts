@@ -245,3 +245,29 @@ export const scheduledVisits = sqliteTable(
     ),
   ],
 );
+
+export const siteCheckIns = sqliteTable(
+  "site_check_ins",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    source: text("source").notNull().default("KIOSK"),
+    status: text("status").notNull().default("PENDING"),
+    requestedAt: text("requested_at").notNull(),
+    verifiedAt: text("verified_at"),
+    verifiedBy: text("verified_by"),
+    signedOutAt: text("signed_out_at"),
+    notes: text("notes").notNull().default(""),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_site_check_ins_status_requested_at").on(table.status, table.requestedAt),
+    index("idx_site_check_ins_person_requested_at").on(table.personId, table.requestedAt),
+    uniqueIndex("idx_site_check_ins_person_open")
+      .on(table.personId)
+      .where(sql`status IN ('PENDING', 'ON_SITE')`),
+  ],
+);
