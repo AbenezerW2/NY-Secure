@@ -100,7 +100,9 @@ type ScheduledVisitRow = {
   hasDelivery: number | boolean;
   packageCount: number;
   packageDetails: string;
-  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "OVERDUE";
+  signedInAt: string | null;
+  signedOutAt: string | null;
   createdAt: string;
 };
 
@@ -266,8 +268,11 @@ export async function getState(db: D1Database) {
           v.valid_until AS validUntil, v.comments,
           v.has_delivery AS hasDelivery, v.package_count AS packageCount,
           v.package_details AS packageDetails,
+          v.signed_in_at AS signedInAt, v.signed_out_at AS signedOutAt,
           CASE
             WHEN v.status = 'CANCELLED' THEN 'CANCELLED'
+            WHEN v.signed_in_at IS NOT NULL AND v.signed_out_at IS NULL
+              AND datetime(v.valid_until) < datetime(?) THEN 'OVERDUE'
             WHEN datetime(v.valid_until) < datetime(?) THEN 'EXPIRED'
             WHEN datetime(v.valid_from) <= datetime(?) THEN 'ACTIVE'
             ELSE 'SCHEDULED'
@@ -276,10 +281,13 @@ export async function getState(db: D1Database) {
          FROM scheduled_visits v
          JOIN organizations o ON o.id = v.organization_id
          JOIN zones z ON z.id = v.cage_zone_id
+         WHERE v.status = 'CANCELLED'
+           OR datetime(v.valid_until) >= datetime(?)
+           OR (v.signed_in_at IS NOT NULL AND v.signed_out_at IS NULL)
          ORDER BY v.valid_from DESC
          LIMIT 100`,
       )
-      .bind(now, now)
+      .bind(now, now, now, now)
       .all<ScheduledVisitRow>(),
     db
       .prepare(

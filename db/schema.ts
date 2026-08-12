@@ -234,6 +234,8 @@ export const scheduledVisits = sqliteTable(
     packageCount: integer("package_count").notNull().default(0),
     packageDetails: text("package_details").notNull().default(""),
     status: text("status").notNull().default("SCHEDULED"),
+    signedInAt: text("signed_in_at"),
+    signedOutAt: text("signed_out_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },

@@ -67,6 +67,14 @@ export async function PATCH(request: Request) {
 
     const db = await ensureDatabase();
     const now = new Date().toISOString();
+    const checkInIdentity = await db
+      .prepare(
+        `SELECT p.first_name || ' ' || p.last_name AS personName, p.email
+         FROM site_check_ins c JOIN people p ON p.id = c.person_id
+         WHERE c.id = ?`,
+      )
+      .bind(id)
+      .first<{ personName: string; email: string }>();
     const command = action === "VERIFY"
       ? db.prepare(
         `UPDATE site_check_ins SET status = 'ON_SITE', verified_at = ?,
@@ -86,6 +94,34 @@ export async function PATCH(request: Request) {
     const result = await command.run() as { meta: { changes?: number } };
     if (Number(result.meta.changes ?? 0) === 0) {
       throw new ApiError(409, "CHECK_IN_STATE_CHANGED", "This check-in is no longer in the required state.");
+    }
+    if (checkInIdentity && action === "VERIFY") {
+      await db
+        .prepare(
+          `UPDATE scheduled_visits SET signed_in_at = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE ticket_number = (
+             SELECT ticket_number FROM scheduled_visits
+             WHERE signed_out_at IS NULL
+               AND (lower(visitor_email) = lower(?) OR lower(visitor_name) = lower(?))
+             ORDER BY abs(julianday(valid_from) - julianday(?)) LIMIT 1
+           )`,
+        )
+        .bind(now, checkInIdentity.email, checkInIdentity.personName, now)
+        .run();
+    }
+    if (checkInIdentity && action === "SIGN_OUT") {
+      await db
+        .prepare(
+          `UPDATE scheduled_visits SET signed_out_at = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE ticket_number = (
+             SELECT ticket_number FROM scheduled_visits
+             WHERE signed_in_at IS NOT NULL AND signed_out_at IS NULL
+               AND (lower(visitor_email) = lower(?) OR lower(visitor_name) = lower(?))
+             ORDER BY signed_in_at DESC LIMIT 1
+           )`,
+        )
+        .bind(now, checkInIdentity.email, checkInIdentity.personName)
+        .run();
     }
     return Response.json({ id, status: action === "VERIFY" ? "ON_SITE" : action === "SIGN_OUT" ? "SIGNED_OUT" : "REJECTED" });
   } catch (error) {
