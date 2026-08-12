@@ -23,6 +23,11 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Filter by alarm type/);
   assert.match(consoleSource, /Customer data/);
   assert.match(consoleSource, /Alarm center/);
+  assert.match(consoleSource, /Last-known access point/);
+  assert.match(consoleSource, /Find a last-known scan/);
+  assert.match(consoleSource, /Locate everyone/);
+  assert.match(consoleSource, /48 \* 60 \* 60 \* 1000/);
+  assert.match(consoleSource, /Everyone’s latest scan/);
   assert.match(consoleSource, /Right-click an alarm/);
   assert.match(consoleSource, /Open contact card/);
   assert.match(consoleSource, /View 24-hour scans/);
