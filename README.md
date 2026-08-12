@@ -1,88 +1,170 @@
 # NY-Secure Physical Security
 
-NY-Secure is an enterprise physical-security simulator designed to make a colocation facility understandable through clear, explainable access control. It models tenants, people, credentials, mantraps, cage inventories, reusable access profiles, time-bounded assignments, and an immutable badge-decision trail.
+NY-Secure is an enterprise physical-security simulator for a colocation facility. It combines identity records, customer and visitor workflows, facility access policies, scheduled visits, alarms, access-event history, and last-known-location reporting in one operator console.
 
-For the living record of implemented behavior and decision logic, see [CAPABILITIES.md](./CAPABILITIES.md).
+The current private deployment is available at [atlas-dc-access-lab.abine26.chatgpt.site](https://atlas-dc-access-lab.abine26.chatgpt.site/).
 
-**Latest update:** Fixed the People tab and added the new search features, internal results tabs, contact cards, and person profile tabs.
+For the detailed access-control rules and facility contract, see [CAPABILITIES.md](./CAPABILITIES.md).
 
-The prototype intentionally does not communicate with real readers, controllers, doors, or identity systems. Every organization, person, badge number, and event is fictional.
+> NY-Secure is a simulation. It does not communicate with real readers, controllers, doors, credentials, identity systems, or customer records. All organizations, people, badge numbers, visits, alarms, and events are fictional.
 
-## Included in this version
+## Current product areas
 
-- NY-Secure branding with a white-and-blue visual system and a device-local light/dark theme preference
-- Interactive DC-01 floor plan with a Main Entrance Mantrap, Loading Dock Mantrap, secure spine, UPS rooms, generator rooms, NOC, receiving, and supporting areas
-- Complete 62-cage inventory: Hall A uses `11000` through `11300` and Hall B uses `22000` through `22300`, both in increments of 10
-- Clickable People on site, Active credentials, Access granted, and Access denied summary cards with photo-backed detail logs
-- A clean, user-configurable overview: the home page starts blank and each operator chooses the widgets they want to see
-- Display settings for light/dark theme, small/comfortable/large text, and compact/comfortable data density
-- Simplified activity history using `Time`, `Who`, `What`, `Where`, and `When`, with all clock times shown in 24-hour format
-- Fictional HFT and network tenants including Citadel Securities, Two Sigma, Hudson River Trading, Jane Street, Lumen Technologies, Zayo, and Boldyn Networks
-- Search-first People directory keyed by first name, last name, provisional organization ID (OID), and company
-- Directory records include work email and phone number; the add form is limited to customers and internal employees
-- Organization and tenant directory
-- Identity-only People workflow that keeps badge access and activity administration out of the directory
-- Default-deny badge simulator with a plain-language decision path
-- Persistent Cloudflare D1 records and access-event history
-- Idempotent local seed data and a generated Drizzle migration
-- Responsive desktop, tablet, and mobile layouts
+The console uses a two-level navigation model. The bottom taskbar switches between the main product areas, while the side navigation shows the pages within the active area. The signed-in operator profile is located at the far-right of the taskbar.
 
-## Facility numbering and secure paths
+### Workspace
 
-Hall cage identifiers are deterministic and inclusive:
+- **Overview** — a device-configurable dashboard that can show security totals, the facility map, recent activity, the attention queue, and the on-site roster. Operators can leave the overview blank or enable any combination of widgets.
+- **Live operations** — presents a credential at a selected access point and explains the resulting default-deny decision, matched policy, reason code, and audit event.
+- **Facility** — explores the DC-01 hierarchy and interactive floor plan, including entrances, mantraps, common areas, critical infrastructure, logistics spaces, and 62 customer cages.
+- **Access policies** — shows reusable, scheduled permission profiles, their covered zones, and current assignees.
+
+### Customer data
+
+- **People** — separates directory search, search results, open profiles, people currently on site, pending security verification, and sign-in history.
+- **Organizations** — displays customers, the data-center operator, network providers, contacts, people, and assigned cage inventory.
+- **Scheduled visits** — creates and tracks temporary customer- or NOC-sponsored work-visit tickets with visitor, access, timing, cabinet, comment, and delivery details.
+
+### Alarm center
+
+- **Locator** — finds a person’s latest matching scan across the complete activity log. Submitting an empty search returns each person’s single latest scan from the past 48 hours.
+- **Alarms** — provides a dedicated alarm report with severity and type filters, CSV export, and person-linked actions.
+- **Activity log** — provides the searchable grant/denial audit trail with decision and location filters plus CSV export.
+
+## People, presence, and profiles
+
+The People workspace is search-first and does not expose the complete directory before a search is submitted. First name, last name, company, and organization ID (OID) are independent search parameters; populated fields are combined with AND matching.
+
+Search results appear as contact cards in an internal results tab. Multiple person profiles can remain open inside the workspace. Each profile includes:
+
+- identity, company, OID, six-digit IBX access PIN, and credit-hold state;
+- current cage and cabinet access derived from active assignments;
+- access history with decision, location, date, and 24-hour time; and
+- person and organizational contact details.
+
+The add-person workflow creates either a **Customer** or **Internal employee** directory record. It creates identity/contact data only; access is managed through profiles and assignments.
+
+Customer, vendor, visitor, and contractor arrivals use the site check-in workflow:
+
+1. A portal or kiosk request creates a **Pending** check-in.
+2. Security can verify and move the person to **On-site**, or reject the request.
+3. Security signs the person out when the visit ends.
+4. **History** records the actual sign-in time, sign-out time, and total time on site.
+
+The People-on-site dashboard total and roster are based on verified, open check-ins rather than the entire directory.
+
+## Scheduled visits
+
+DC-01 visit tickets use the format `01-XXXXXX`. A ticket records:
+
+- requesting customer or NY-Secure NOC;
+- requester and visitor identity/contact details;
+- customer cage and permitted cabinet references;
+- start time and a validity duration from 1 to 168 hours;
+- optional comments; and
+- delivery status, package count, and package details.
+
+The visit board shows upcoming, active, delivery, and status information. Each column has its own search field in addition to the general search and status filter.
+
+Expired tickets disappear immediately when the visitor is not signed in. If the visitor remains signed in after the valid window ends, the ticket stays visible as **Signed in · overdue** and the row receives a red warning outline. Security verification and sign-out update the matching scheduled ticket when the person and ticket identity can be correlated.
+
+## Alarms and activity
+
+Alarms are separated from customer-directory data and use the report columns:
+
+```text
+Time (24-hour) | When | Who | What | Where
+```
+
+The seeded alarm scenarios currently include:
+
+- Door held
+- Door forced
+- Unknown card
+- Wrong door
+- Wrong time
+- Expired card
+- Incorrect time
+- Monitoring point alarm
+- Repeated invalid scan
+
+Known-person alarms support a right-click or overflow action that opens either the person’s contact card or their scan locations from the previous 24 hours.
+
+The activity log remains a separate access-decision report using:
+
+```text
+Time (24-hour) | Who | What | Where | When
+```
+
+Every simulated access decision records the person, zone, matched assignment/profile when present, grant or denial, reason code, plain-language explanation, and timestamp.
+
+## Locator
+
+Locator has two operating modes:
+
+- Enter a name, badge, company, OID, or other supported pattern to find the most recent matching access event in the complete log.
+- Leave the search blank and select **Locate everyone** to return one last-known scan per person from the past 48 hours.
+
+Results include the person, customer, last location, decision, and scan timestamp.
+
+## Wildcard search
+
+Search fields across the console support `*` as a wildcard:
+
+```text
+*some*  contains "some"
+*ome    ends with "ome"
+som*    starts with "som"
+```
+
+Without `*`, searches use case-insensitive contains matching. Wildcards are available in global people search, directory fields, scheduled visits and their individual columns, locator, alarms, activity, policies, and other searchable records.
+
+## Facility and access decisions
+
+The simulated DC-01 facility contains 81 modeled zones, including 62 customer cages:
 
 ```text
 Hall A: 11000, 11010, 11020, ... 11290, 11300  (31 cages)
 Hall B: 22000, 22010, 22020, ... 22290, 22300  (31 cages)
 ```
 
-The primary people route places the Main Entrance Mantrap immediately after the Main Entrance. The logistics route places the Loading Dock Mantrap between the Loading Dock and Receiving & Staging. Access profiles include the relevant mantrap so the simulator evaluates each controlled transition explicitly.
+The primary people route places the Main Entrance Mantrap immediately after the Main Entrance. The logistics route places the Loading Dock Mantrap between the Loading Dock and Receiving & Staging.
 
-## Dashboard logs and theme
+Access is profile-driven rather than role-driven. A simulated credential presentation follows a default-deny policy:
 
-Each overview summary card is an interactive tab into a focused log drawer:
+1. Confirm that the person and destination exist and are active.
+2. Find active assignments inside their validity windows.
+3. Grant when an assigned profile permits the selected zone.
+4. Deny otherwise with a specific reason code.
+5. Persist the decision as an access event.
 
-- **People on site** shows active occupants, photos, organization, last verified area, and relationship type.
-- **Active credentials** shows active badge holders, photos, badge identifiers, and credential status.
-- **Access granted** shows successful access events with photos, zones, explanations, and timestamps.
-- **Access denied** shows denied events with photos, reason context, zones, and timestamps.
+Revocation soft-disables an assignment instead of deleting historical evidence.
 
-The overview starts as a clean canvas. Operators can open **Customize overview** or the settings menu to add the security summary, facility map, recent activity, attention queue, and on-site roster in any combination. Leaving every widget disabled keeps the home page blank.
+## Display and responsive behavior
 
-The settings menu also controls light/dark appearance, three text sizes, and compact or comfortable data density. These device-local display preferences are stored in the browser. Security identities, assignments, zones, and access events remain durable D1 records.
+- Light and dark themes
+- Small, comfortable, and large text sizes
+- Compact and comfortable information density
+- Configurable overview widgets
+- Persistent device-local display preferences
+- Desktop sidebar with independent scrolling
+- Fixed bottom main-area taskbar
+- Compact two-row navigation on mobile
 
-The full activity view deliberately omits organization and event-ID columns. It presents only:
+Identity, access, visit, alarm, and check-in records remain in D1; only display preferences are stored in the browser.
 
-```text
-Time (24-hour) | Who | What | Where | When
-```
+## Technology
 
-Search, decision filtering, location filtering, responsive mobile cards, and CSV export use the same simplified field set.
-
-## People directory
-
-The People tab is a search database rather than a roster. First name, last name, company name, and OID are independent search parameters; when more than one is entered, every populated field must match. Typing does not reveal records—the operator must select **Search**. Matching results contain identity and contact fields only, and the single Add person action remains in the page header.
-
-Executing a search opens a separate **Search results** tab inside the NY-Secure People workspace—not a browser tab. Directory search remains available for editing the query. The results tab replaces the former data table with compact contact cards showing Customer or Internal, a blank contact photo, the person’s name, and company. Selecting a contact card opens that person’s existing full profile tab. Multiple person profiles can stay open, and every results/profile tab can be selected or closed independently.
-
-The profile card uses a blank contact-photo placeholder. The identity summary shows the person’s name, six-digit IBX access PIN, OID, company, and credit-hold state. PINs start at `000001` for the seeded directory and increment for each new person. The profile includes three tabs:
-
-- **Access** — active cage assignments and their simulated cabinet identifiers.
-- **Access history** — previous grants and denials with location, date, and 24-hour time.
-- **Contact** — company, organizational point of contact and phone, the person’s phone, and work email.
-
-Stock profile imagery is intentionally not used. Credit-hold state is durable D1 data and defaults to no hold; a future billing workflow can manage it.
-
-The current OID is a stable, human-readable identifier derived from the organization slug (for example, `OID-CITADEL-SECURITIES`). This is an interim directory key; the organization-management phase can replace it with a dedicated OID model without changing the search experience.
-
-The Add person form supports two directory record types:
-
-- **Customer** — no job function is requested or stored.
-- **Internal employee** — job function is available with Engineer, Technician, Facilities, Operations, and Other choices.
-
-Phone number is required. Visitors, contractors, and vendors are excluded from this form because external identities will be created by a separate ticket-intake workflow in a later phase. Creating a person here creates a directory record only; it does not expose badge or access controls in the People interface.
+- React 19 and TypeScript
+- vinext/Vite application runtime
+- Cloudflare Workers-compatible server output
+- Cloudflare D1 persistence
+- Drizzle schema and migrations
+- Next-compatible routing and API handlers
 
 ## Run locally
+
+Requirements: Node.js `22.13.0` or newer.
 
 ```bash
 npm install
@@ -94,23 +176,29 @@ Useful checks:
 ```bash
 npm run build
 npm test
+npm run lint
+npx tsc --noEmit
 npm run db:generate
 ```
 
 ## Data model
 
-The D1 schema separates identity from authorization:
+The D1 schema separates identity, authorization, operations, and history:
 
-- `organizations` own people and represent operators, customers, contractors, and vendors
-- `zones` represent controlled facility spaces
-- `people` hold identity/contact data and legacy simulator credential references; the People UI exposes only identity/contact fields
-- `access_profiles` group reusable policy intent
-- `profile_zone_rules` connect profiles to allowed zones
-- `access_assignments` grant a profile to a person for a validity window
-- `access_events` preserve every simulated grant or denial
+- `organizations` — operators, customers, and network/service providers
+- `people` — identity, contact, organization, PIN, credential reference, and status
+- `zones` — controlled facility spaces
+- `access_profiles` — reusable policy intent
+- `profile_zone_rules` — allowed zones for each profile
+- `access_assignments` — time-bounded profile grants and soft revocation
+- `access_events` — immutable simulated grants and denials
+- `alarms` — alarm type, severity, person/actor, zone, source, status, and time
+- `scheduled_visits` — temporary visit scope, valid window, deliveries, and sign-in state
+- `site_check_ins` — pending, on-site, rejected, and signed-out presence records
 
-Revoking access soft-disables the assignment rather than deleting historical evidence.
+Database initialization is idempotent and the repository includes generated Drizzle migrations for deployment.
 
-## Origin
+## Repository notes
 
-The original Python sketch is retained unchanged in `work/original/` as a record of where the idea started.
+- [CAPABILITIES.md](./CAPABILITIES.md) is the detailed facility and decision-logic ledger.
+- The original Python sketch is retained unchanged in `work/original/` as a record of the project’s starting point.
