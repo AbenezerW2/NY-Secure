@@ -52,6 +52,10 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Sign-in history/);
   assert.match(consoleSource, /Time on-site/);
   assert.match(consoleSource, /formatOnSiteDuration/);
+  assert.match(consoleSource, /function wildcardMatch/);
+  assert.match(consoleSource, /function wildcardMatchAny/);
+  assert.match(consoleSource, /\*some\*/);
+  assert.match(consoleSource, /Use \* to match any characters/);
   assert.match(consoleSource, /\/api\/check-ins/);
   assert.match(consoleSource, /people-workspace-tabs/);
   assert.match(consoleSource, /Directory search/);

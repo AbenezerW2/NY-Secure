@@ -1002,6 +1002,8 @@ select:focus-visible {
 .contact-results-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 26px; border-bottom: 1px solid #e2e9ed; }
 .contact-results-panel > header h2 { margin: 4px 0 0; color: #263f45; font-size: calc(18px * var(--font-scale)); }
 .contact-results-panel > header p:last-child { margin: 6px 0 0; color: #7d8e94; font-size: calc(8px * var(--font-scale)); }
+.wildcard-example { max-width: 360px; color: var(--muted); font-size: calc(7px * var(--font-scale)); line-height: 1.7; text-align: right; }
+.wildcard-example code { padding: 3px 5px; color: #2768c8; background: #eaf2ff; border-radius: 4px; font-family: var(--font-geist-mono), monospace; }
 .contact-card-grid { display: grid; grid-template-columns: repeat(3, minmax(230px, 1fr)); gap: 15px; padding: 26px; }
 .person-contact-card { min-width: 0; padding: 0; overflow: hidden; color: inherit; background: #fff; border: 1px solid #d5e0e7; border-radius: 12px; box-shadow: 0 4px 14px rgba(28, 57, 79, .06); cursor: pointer; text-align: left; transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease; }
 .person-contact-card:hover { transform: translateY(-2px); border-color: #7aa9e8; box-shadow: 0 9px 24px rgba(28, 76, 127, .12); }
@@ -1766,6 +1768,7 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .presence-total.history { color: #b7c7f5; background: #202d51; border-color: #35466f; }
 .app-shell[data-theme="dark"] .time-on-site { color: #8ed6bd; background: #11362e; border-color: #225a4c; }
 .app-shell[data-theme="dark"] .contact-results-panel > header { border-color: var(--line); }
+.app-shell[data-theme="dark"] .wildcard-example code { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] :is(.contact-results-panel > header h2, .contact-card-name strong) { color: var(--ink); }
 .app-shell[data-theme="dark"] .person-contact-card { background: #132238; border-color: var(--line); }
 .app-shell[data-theme="dark"] .contact-card-type { border-color: var(--line); }
@@ -1868,6 +1871,7 @@ select:focus-visible {
   .people-search-grid { grid-template-columns: 1fr; }
   .people-search-button { grid-column: 1; width: 100%; }
   .contact-results-panel > header { align-items: flex-start; flex-direction: column; padding: 19px 17px; }
+  .wildcard-example { text-align: left; }
   .contact-card-grid { grid-template-columns: 1fr; padding: 17px; }
   .people-results-meta { align-items: flex-start; flex-direction: column; padding-inline: 17px; }
   .identity-results { min-width: 0; }

@@ -283,6 +283,22 @@ function label(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function wildcardMatch(value: unknown, pattern: string) {
+  const normalizedPattern = pattern.trim().toLowerCase();
+  if (!normalizedPattern) return true;
+  const normalizedValue = String(value ?? "").toLowerCase();
+  if (!normalizedPattern.includes("*")) return normalizedValue.includes(normalizedPattern);
+  const expression = normalizedPattern
+    .split("*")
+    .map((part) => part.replace(/[|\\{}()[\]^$+?.]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${expression}$`, "i").test(normalizedValue);
+}
+
+function wildcardMatchAny(values: unknown[], pattern: string) {
+  return values.some((value) => wildcardMatch(value, pattern));
+}
+
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -777,10 +793,11 @@ export default function NySecureConsole() {
           <label className="global-search">
             <span aria-hidden="true">⌕</span>
             <input
-              aria-label="Search people, badges, or zones"
+              aria-label="Search people, badges, companies, or OIDs"
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setActiveView("people")}
-              placeholder="Search people, badges, zones…"
+              placeholder="Search people, badges… Try *name*"
+              title="Use * to match any characters"
               value={query}
             />
             <kbd>⌘ K</kbd>
@@ -876,6 +893,7 @@ export default function NySecureConsole() {
                   zones={zoneMap}
                   checkIns={data.checkIns}
                   onCheckInsChanged={loadState}
+                  globalQuery={query}
                 />
               )}
               {activeView === "organizations" && (
@@ -1315,6 +1333,7 @@ function PeopleView({
   zones,
   checkIns,
   onCheckInsChanged,
+  globalQuery,
 }: {
   people: Person[];
   orgMap: Map<string, Organization>;
@@ -1324,6 +1343,7 @@ function PeopleView({
   zones: Map<string, Zone>;
   checkIns: SiteCheckIn[];
   onCheckInsChanged: () => Promise<void>;
+  globalQuery: string;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1331,7 +1351,8 @@ function PeopleView({
   const [oid, setOid] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState<{ firstName: string; lastName: string; company: string; oid: string } | null>(null);
   const [openPeople, setOpenPeople] = useState<Person[]>([]);
-  const [activePeopleTab, setActivePeopleTab] = useState("onsite");
+  const [storedPeopleTab, setActivePeopleTab] = useState("onsite");
+  const activePeopleTab = globalQuery.trim() ? "global" : storedPeopleTab;
   const [checkInAction, setCheckInAction] = useState<string | null>(null);
   const [checkInError, setCheckInError] = useState("");
   const onSite = checkIns.filter((checkIn) => checkIn.status === "ON_SITE");
@@ -1342,17 +1363,29 @@ function PeopleView({
   const canSearch = [firstName, lastName, company, oid].some((value) => value.trim().length > 0);
   const filteredPeople = useMemo(() => {
     if (!submittedSearch) return [];
-    const matches = (value: string, search: string) => value.toLowerCase().includes(search.trim().toLowerCase());
     return people.filter((person) => {
       const organization = orgMap.get(person.organizationId);
       return (
-        (!submittedSearch.firstName || matches(person.firstName, submittedSearch.firstName)) &&
-        (!submittedSearch.lastName || matches(person.lastName, submittedSearch.lastName)) &&
-        (!submittedSearch.company || matches(person.organizationName || organization?.name || "", submittedSearch.company)) &&
-        (!submittedSearch.oid || matches(organization?.oid || person.organizationId, submittedSearch.oid))
+        wildcardMatch(person.firstName, submittedSearch.firstName) &&
+        wildcardMatch(person.lastName, submittedSearch.lastName) &&
+        wildcardMatch(person.organizationName || organization?.name || "", submittedSearch.company) &&
+        wildcardMatch(organization?.oid || person.organizationId, submittedSearch.oid)
       );
     });
   }, [orgMap, people, submittedSearch]);
+  const globalPeople = useMemo(() => people.filter((person) => {
+    const organization = orgMap.get(person.organizationId);
+    return wildcardMatchAny([
+      person.firstName,
+      person.lastName,
+      `${person.firstName} ${person.lastName}`,
+      person.badgeId,
+      person.email,
+      person.organizationName,
+      organization?.name,
+      organization?.oid,
+    ], globalQuery);
+  }), [globalQuery, orgMap, people]);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1400,6 +1433,7 @@ function PeopleView({
         <button className={activePeopleTab === "pending" ? "active" : ""} onClick={() => setActivePeopleTab("pending")} type="button"><span aria-hidden="true">◷</span> Pending <b>{pending.length}</b></button>
         <button className={activePeopleTab === "history" ? "active" : ""} onClick={() => setActivePeopleTab("history")} type="button"><span aria-hidden="true">↶</span> History <b>{history.length}</b></button>
         <button className={activePeopleTab === "search" ? "active" : ""} onClick={() => setActivePeopleTab("search")} type="button"><span aria-hidden="true">⌕</span> Directory</button>
+        {globalQuery.trim() && <button className={activePeopleTab === "global" ? "active" : ""} type="button"><span aria-hidden="true">⌘</span> Global results <b>{globalPeople.length}</b></button>}
         {submittedSearch && <div className={activePeopleTab === "results" ? "people-tab-shell active" : "people-tab-shell"}><button className="person-tab results-tab" onClick={() => setActivePeopleTab("results")} type="button"><span aria-hidden="true">⌗</span> Search results</button><button className="close-people-tab" aria-label="Close search results" onClick={() => { setSubmittedSearch(null); if (activePeopleTab === "results") setActivePeopleTab("search"); }} type="button">×</button></div>}
         {openPeople.map((person) => <div className={activePeopleTab === person.id ? "people-tab-shell active" : "people-tab-shell"} key={person.id}><button className="person-tab" onClick={() => setActivePeopleTab(person.id)} type="button"><span className="mini-contact-photo" aria-hidden="true"><i /></span>{person.firstName} {person.lastName}</button><button className="close-people-tab" aria-label={`Close ${person.firstName} ${person.lastName} profile`} onClick={() => closeProfile(person.id)} type="button">×</button></div>)}
       </nav>
@@ -1432,20 +1466,21 @@ function PeopleView({
         <td><strong>{checkIn.verifiedBy || "Security"}</strong><small>Identity verified</small></td>
       </tr>)}</tbody></table>{history.length === 0 && <div className="presence-empty"><span>↶</span><h3>No completed sign-ins yet</h3><p>Signed-out visits will appear here with their total time on-site.</p></div>}</div>
     </section>}
+    {activePeopleTab === "global" && globalQuery.trim() && <section className="panel contact-results-panel"><header><div><p className="eyebrow">Wildcard global search</p><h2>Results for “{globalQuery}”</h2><p>{globalPeople.length} {globalPeople.length === 1 ? "person matches" : "people match"} across names, badges, emails, companies, and OIDs.</p></div><span className="wildcard-example"><code>*some*</code> contains · <code>*ome</code> ends with · <code>som*</code> starts with</span></header>{globalPeople.length > 0 ? <div className="contact-card-grid">{globalPeople.map((person) => { const organization = orgMap.get(person.organizationId); const isInternal = person.relationshipType === "ENGINEER" || organization?.type === "DATA_CENTER_OPERATOR"; return <button className="person-contact-card" key={person.id} onClick={() => openProfile(person)} type="button"><span className={`contact-card-type ${isInternal ? "internal" : "customer"}`}>{isInternal ? "Internal" : "Customer"}</span><span className="contact-card-body"><span className="contact-card-photo" aria-label="No profile photo"><i /><b /></span><span className="contact-card-name"><strong>{person.firstName} {person.lastName}</strong><small>{person.badgeId} · {organization?.name ?? person.organizationName}</small></span><span className="contact-card-menu" aria-hidden="true">⠿</span></span></button>; })}</div> : <div className="table-empty contact-results-empty"><span>⌕</span><h3>No matching people</h3><p>Try another wildcard pattern.</p></div>}</section>}
     {activePeopleTab === "search" && <section className="panel directory-panel people-directory">
       <div className="people-search-header">
         <div>
           <p className="eyebrow">Directory search</p>
           <h2>Find a person</h2>
-          <p>Search by first name, last name, OID, or company.</p>
+          <p>Search by first name, last name, OID, or company. Use * as a wildcard.</p>
         </div>
       </div>
       <form className="people-search-box" onSubmit={search}>
         <div className="people-search-grid">
-          <label className="people-query"><span>First name</span><input aria-label="Search by first name" placeholder="e.g. Amara" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoFocus /></label>
-          <label className="people-query"><span>Last name</span><input aria-label="Search by last name" placeholder="e.g. Okafor" value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
-          <label className="people-query"><span>Company name</span><input aria-label="Search by company name" placeholder="e.g. Citadel Securities" value={company} onChange={(event) => setCompany(event.target.value)} /></label>
-          <label className="people-query"><span>OID</span><input aria-label="Search by OID" placeholder="e.g. OID-CITADEL-SECURITIES" value={oid} onChange={(event) => setOid(event.target.value)} /></label>
+          <label className="people-query"><span>First name</span><input aria-label="Search by first name" placeholder="e.g. Ama*" title="Use * to match any characters" value={firstName} onChange={(event) => setFirstName(event.target.value)} autoFocus /></label>
+          <label className="people-query"><span>Last name</span><input aria-label="Search by last name" placeholder="e.g. *kafor" title="Use * to match any characters" value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
+          <label className="people-query"><span>Company name</span><input aria-label="Search by company name" placeholder="e.g. *Securities*" title="Use * to match any characters" value={company} onChange={(event) => setCompany(event.target.value)} /></label>
+          <label className="people-query"><span>OID</span><input aria-label="Search by OID" placeholder="e.g. OID-CITADEL-*" title="Use * to match any characters" value={oid} onChange={(event) => setOid(event.target.value)} /></label>
           <button className="primary-button people-search-button" disabled={!canSearch} type="submit"><span aria-hidden="true">⌕</span> Search</button>
         </div>
       </form>
@@ -1533,12 +1568,19 @@ function OrganizationsView({ organizations, people, zones }: { organizations: Or
 }
 
 function PoliciesView({ profiles, assignments, zones }: { profiles: Profile[]; assignments: Assignment[]; zones: Zone[] }) {
+  const [search, setSearch] = useState("");
+  const filteredProfiles = profiles.filter((profile) => wildcardMatchAny([
+    profile.name,
+    profile.description,
+    profile.schedule,
+    ...(profile.zones ?? []).map((zoneId) => zones.find((zone) => zone.id === zoneId)?.name || zoneId),
+  ], search));
   return (
     <div className="policies-layout">
       <section className="panel policy-table-panel">
-        <div className="directory-toolbar"><label className="table-search"><span>⌕</span><input placeholder="Search policies…" /></label><div className="toolbar-filters"><button type="button">All schedules <span>⌄</span></button><button type="button">All scopes <span>⌄</span></button></div><span className="result-count">{profiles.length} profiles</span></div>
+        <div className="directory-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search policies" onChange={(event) => setSearch(event.target.value)} placeholder="Search policies… Try *critical*" title="Use * to match any characters" value={search} /></label><div className="toolbar-filters"><button type="button">All schedules <span>⌄</span></button><button type="button">All scopes <span>⌄</span></button></div><span className="result-count">{filteredProfiles.length} profiles</span></div>
         <div className="policy-list">
-          {profiles.map((profile, index) => {
+          {filteredProfiles.map((profile, index) => {
             const assignees = assignments.filter((assignment) => assignment.profileId === profile.id && assignment.status === "ACTIVE");
             return (
               <article className="policy-row" key={profile.id}>
@@ -1549,6 +1591,7 @@ function PoliciesView({ profiles, assignments, zones }: { profiles: Profile[]; a
               </article>
             );
           })}
+          {filteredProfiles.length === 0 && <div className="activity-empty"><strong>No matching policies</strong><span>Try another wildcard pattern.</span></div>}
         </div>
       </section>
       <aside className="panel policy-principles">
@@ -1585,8 +1628,7 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const filteredVisits = visits.filter((visit) => {
-    const needle = search.trim().toLowerCase();
-    const matchesSearch = !needle || [visit.ticketNumber, visit.visitorName, visit.organizationName, visit.requesterName, visit.cageName, visit.cabinetAccess.join(" "), visit.comments, visit.packageDetails].join(" ").toLowerCase().includes(needle);
+    const matchesSearch = wildcardMatchAny([visit.ticketNumber, visit.visitorName, visit.organizationName, visit.requesterName, visit.cageName, visit.cabinetAccess.join(" "), visit.comments, visit.packageDetails], search);
     return matchesSearch && (status === "ALL" || visit.status === status);
   });
   const scheduledCount = visits.filter((visit) => visit.status === "SCHEDULED").length;
@@ -1602,7 +1644,7 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
       </div>
       <section className="panel directory-panel visits-panel">
         <div className="directory-toolbar activity-toolbar visits-toolbar">
-          <label className="table-search"><span>⌕</span><input aria-label="Search scheduled visits" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search ticket, visitor, customer, cage, or cabinet…" /></label>
+          <label className="table-search"><span>⌕</span><input aria-label="Search scheduled visits" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visits… Try 01-*" title="Use * to match any characters" /></label>
           <div className="toolbar-filters visit-filters">
             <select aria-label="Filter visits by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="EXPIRED">Expired</option><option value="CANCELLED">Cancelled</option></select>
           </div>
@@ -1634,7 +1676,7 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
   const peopleMap = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const results = useMemo(() => {
     if (!searchRequest) return [];
-    const needle = searchRequest.query.toLowerCase();
+    const needle = searchRequest.query;
     const cutoff = searchRequest.requestedAt - 48 * 60 * 60 * 1000;
     const latestByPerson = new Map<string, AccessEvent>();
 
@@ -1656,8 +1698,8 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
         person?.organizationName,
         organization?.name,
         organization?.oid,
-      ].join(" ").toLowerCase();
-      if (needle && !searchable.includes(needle)) continue;
+      ];
+      if (needle && !wildcardMatchAny(searchable, needle)) continue;
 
       const key = event.personId || event.personName || String(event.id);
       const current = latestByPerson.get(key);
@@ -1684,7 +1726,7 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
       <section className="panel locator-search-panel">
         <div className="locator-search-copy"><span className="locator-mark" aria-hidden="true">⌖</span><div><p className="eyebrow">Activity-log lookup</p><h2>Find a last-known scan</h2><p>Enter a person, badge, company, or OID to search the complete log. Leave the field empty to locate everyone who scanned during the past 48 hours.</p></div></div>
         <form className="locator-form" onSubmit={locate}>
-          <label><span>Person or customer record</span><div><i aria-hidden="true">⌕</i><input aria-label="Search locator by person, badge, company, or OID" onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Amara Okafor, badge, company, or OID" value={query} /></div></label>
+          <label><span>Person or customer record</span><div><i aria-hidden="true">⌕</i><input aria-label="Search locator by person, badge, company, or OID" onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Ama*, *Securities*, or OID-*" title="Use * to match any characters" value={query} /></div></label>
           <button className="primary-button" type="submit"><span aria-hidden="true">⌖</span>{query.trim() ? "Locate person" : "Locate everyone"}</button>
         </form>
         <div className="locator-mode-note"><span>48h</span><p><strong>Empty-search mode</strong> scans the activity log and returns each person’s single most recent location within the last 48 hours.</p></div>
@@ -1737,8 +1779,7 @@ function AlarmsView({
   const [profileRequest, setProfileRequest] = useState<{ personId: string; tab: ProfileTab } | null>(null);
   const alarmTypes = Array.from(new Set(alarms.map((alarm) => alarm.alarmType))).sort();
   const filteredAlarms = alarms.filter((alarm) => {
-    const needle = search.trim().toLowerCase();
-    const matchesSearch = !needle || [alarm.personName, alarm.alarmType, alarm.zoneName, alarm.source, alarm.detail].join(" ").toLowerCase().includes(needle);
+    const matchesSearch = wildcardMatchAny([alarm.personName, alarm.alarmType, label(alarm.alarmType), alarm.zoneName, alarm.source, alarm.detail], search);
     const matchesType = alarmType === "ALL" || alarm.alarmType === alarmType;
     const matchesSeverity = severity === "ALL" || alarm.severity === severity;
     return matchesSearch && matchesType && matchesSeverity;
@@ -1789,7 +1830,7 @@ function AlarmsView({
   return (
     <section className="panel directory-panel alarms-panel">
       <div className="directory-toolbar activity-toolbar alarms-toolbar">
-        <label className="table-search"><span>⌕</span><input aria-label="Search alarms" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search alarms, people, or locations…" /></label>
+        <label className="table-search"><span>⌕</span><input aria-label="Search alarms" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search alarms… Try *door*" title="Use * to match any characters" /></label>
         <div className="toolbar-filters">
           <select aria-label="Filter by alarm type" value={alarmType} onChange={(event) => setAlarmType(event.target.value)}><option value="ALL">All alarm types</option>{alarmTypes.map((item) => <option value={item} key={item}>{label(item)}</option>)}</select>
           <select aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
@@ -1851,8 +1892,7 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
   const [zone, setZone] = useState("ALL");
   const zones = Array.from(new Set(events.map((event) => event.zoneName || event.zoneId))).sort();
   const filteredEvents = events.filter((event) => {
-    const needle = search.trim().toLowerCase();
-    const matchesSearch = !needle || [event.personName, event.zoneName, event.reasonCode, event.explanation].join(" ").toLowerCase().includes(needle);
+    const matchesSearch = wildcardMatchAny([event.personName, event.zoneName, event.decision, event.decision === "GRANTED" ? "Access granted" : "Access denied", event.reasonCode, label(event.reasonCode), event.explanation], search);
     const matchesDecision = decision === "ALL" || event.decision === decision;
     const matchesZone = zone === "ALL" || (event.zoneName || event.zoneId) === zone;
     return matchesSearch && matchesDecision && matchesZone;
@@ -1878,7 +1918,7 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
   return (
     <section className="panel directory-panel">
       <div className="directory-toolbar activity-toolbar">
-        <label className="table-search"><span>⌕</span><input aria-label="Search activity" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search who, what, or where…" /></label>
+        <label className="table-search"><span>⌕</span><input aria-label="Search activity" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search activity… Try *granted*" title="Use * to match any characters" /></label>
         <div className="toolbar-filters">
           <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="GRANTED">Granted</option><option value="DENIED">Denied</option></select>
           <select aria-label="Filter by zone" value={zone} onChange={(event) => setZone(event.target.value)}><option value="ALL">All locations</option>{zones.map((item) => <option key={item}>{item}</option>)}</select>
