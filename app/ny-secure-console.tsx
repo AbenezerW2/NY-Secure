@@ -142,6 +142,7 @@ type StatTab = "people" | "credentials" | "grants" | "denials";
 type DashboardWidget = "stats" | "facility" | "activity" | "attention" | "roster";
 type FontSizePreference = "small" | "comfortable" | "large";
 type DensityPreference = "compact" | "comfortable";
+type ProfileTab = "access" | "history" | "contact";
 
 const DASHBOARD_WIDGETS: { id: DashboardWidget; label: string; description: string }[] = [
   { id: "stats", label: "Security summary", description: "People, credentials, grants, and denials" },
@@ -151,16 +152,31 @@ const DASHBOARD_WIDGETS: { id: DashboardWidget; label: string; description: stri
   { id: "roster", label: "On-site roster", description: "Currently active people and access" },
 ];
 
-const NAV_ITEMS: { id: View; label: string; symbol: string }[] = [
-  { id: "overview", label: "Overview", symbol: "OV" },
-  { id: "operations", label: "Live operations", symbol: "OP" },
-  { id: "people", label: "People", symbol: "PE" },
-  { id: "organizations", label: "Organizations", symbol: "OR" },
-  { id: "policies", label: "Access policies", symbol: "AP" },
-  { id: "facility", label: "Facility", symbol: "FC" },
-  { id: "visits", label: "Scheduled visits", symbol: "SV" },
-  { id: "alarms", label: "Alarms", symbol: "AR" },
-  { id: "activity", label: "Activity log", symbol: "AL" },
+const NAV_GROUPS: { label: string; items: { id: View; label: string; symbol: string }[] }[] = [
+  {
+    label: "Workspace",
+    items: [
+      { id: "overview", label: "Overview", symbol: "OV" },
+      { id: "operations", label: "Live operations", symbol: "OP" },
+      { id: "facility", label: "Facility", symbol: "FC" },
+      { id: "policies", label: "Access policies", symbol: "AP" },
+    ],
+  },
+  {
+    label: "Customer data",
+    items: [
+      { id: "people", label: "People", symbol: "PE" },
+      { id: "organizations", label: "Organizations", symbol: "OR" },
+      { id: "visits", label: "Scheduled visits", symbol: "SV" },
+    ],
+  },
+  {
+    label: "Alarm center",
+    items: [
+      { id: "alarms", label: "Alarms", symbol: "AR" },
+      { id: "activity", label: "Activity log", symbol: "AL" },
+    ],
+  },
 ];
 
 const FLOOR_ROOMS = [
@@ -648,20 +664,22 @@ export default function NySecureConsole() {
         </div>
 
         <nav className="primary-nav" aria-label="Primary navigation">
-          <p className="nav-section-label">Workspace</p>
-          {NAV_ITEMS.map((item) => (
-            <button
-              className={activeView === item.id ? "nav-item active" : "nav-item"}
-              key={item.id}
-              onClick={() => setActiveView(item.id)}
-              type="button"
-            >
-              <span className="nav-symbol" aria-hidden="true">
-                {item.symbol}
-              </span>
-              <span>{item.label}</span>
-              {item.id === "operations" && <i>LIVE</i>}
-            </button>
+          {NAV_GROUPS.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <p className="nav-section-label">{group.label}</p>
+              {group.items.map((item) => (
+                <button
+                  className={activeView === item.id ? "nav-item active" : "nav-item"}
+                  key={item.id}
+                  onClick={() => setActiveView(item.id)}
+                  type="button"
+                >
+                  <span className="nav-symbol" aria-hidden="true">{item.symbol}</span>
+                  <span>{item.label}</span>
+                  {item.id === "operations" && <i>LIVE</i>}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -818,7 +836,17 @@ export default function NySecureConsole() {
                 />
               )}
               {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} />}
-              {activeView === "alarms" && <AlarmsView alarms={data.alarms} />}
+              {activeView === "alarms" && (
+                <AlarmsView
+                  alarms={data.alarms}
+                  people={data.people}
+                  orgMap={orgMap}
+                  assignments={data.assignments}
+                  profiles={profileMap}
+                  events={data.events}
+                  zones={zoneMap}
+                />
+              )}
               {activeView === "activity" && <ActivityView events={data.events} />}
             </>
           )}
@@ -1313,6 +1341,7 @@ function PersonProfileCard({
   profiles,
   events,
   zones,
+  initialTab = "access",
 }: {
   person: Person;
   organization?: Organization;
@@ -1320,9 +1349,16 @@ function PersonProfileCard({
   profiles: Map<string, Profile>;
   events: AccessEvent[];
   zones: Map<string, Zone>;
+  initialTab?: ProfileTab;
 }) {
-  const [activeTab, setActiveTab] = useState<"access" | "history" | "contact">("access");
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
+  const [profileOpenedAt] = useState(() => Date.now());
   const cageIds = Array.from(new Set(assignments.flatMap((assignment) => profiles.get(assignment.profileId)?.zones ?? []).filter((zoneId) => zones.get(zoneId)?.type === "CAGE" || zoneId.startsWith("zone-cage-"))));
+  const recentEvents = events.filter((event) => {
+    const occurredAt = new Date(event.occurredAt).getTime();
+    return Number.isFinite(occurredAt) && occurredAt >= profileOpenedAt - 24 * 60 * 60 * 1000 && occurredAt <= profileOpenedAt;
+  });
+  const recentLocations = new Set(recentEvents.map((event) => event.zoneName ?? event.zoneId)).size;
   return (
       <article className="panel person-profile-card person-profile-page" aria-label={`${person.firstName} ${person.lastName} profile`}>
         <aside className="profile-identity">
@@ -1339,12 +1375,12 @@ function PersonProfileCard({
         <section className="profile-details">
           <nav className="profile-tabs" aria-label="Profile sections">
             <button className={activeTab === "access" ? "active" : ""} onClick={() => setActiveTab("access")} type="button">Access</button>
-            <button className={activeTab === "history" ? "active" : ""} onClick={() => setActiveTab("history")} type="button">Access history</button>
+            <button className={activeTab === "history" ? "active" : ""} onClick={() => setActiveTab("history")} type="button">24-hour scans</button>
             <button className={activeTab === "contact" ? "active" : ""} onClick={() => setActiveTab("contact")} type="button">Contact</button>
           </nav>
           <div className="profile-tab-content">
             {activeTab === "access" && <div className="profile-access"><div className="profile-tab-heading"><p className="eyebrow">Current authorization</p><h3>Cages and cabinets</h3></div>{cageIds.length > 0 ? <div className="cage-access-list">{cageIds.map((zoneId) => { const cage = zones.get(zoneId); const number = cage?.name.match(/\d+/)?.[0] ?? zoneId.replace("zone-cage-", ""); return <article key={zoneId}><span className="cage-access-icon">▦</span><div><strong>{cage?.name ?? `Cage ${number}`}</strong><small>Cabinets</small><p><code>CAB-{number}-01</code><code>CAB-{number}-02</code></p></div></article>; })}</div> : <div className="profile-empty"><span>⊘</span><strong>No cage or cabinet assignments</strong><p>This person has no active customer-space authorization.</p></div>}</div>}
-            {activeTab === "history" && <div className="profile-history"><div className="profile-tab-heading"><p className="eyebrow">Previous activity</p><h3>Access history</h3></div>{events.length > 0 ? <div className="profile-history-list">{events.map((event) => <article key={event.id}><span className={`history-mark ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"}</span><div><strong>{event.zoneName ?? event.zoneId}</strong><small>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</small></div><time><b>{formatDate(event.occurredAt)}</b><small>{formatTime(event.occurredAt)}</small></time></article>)}</div> : <div className="profile-empty"><span>⌁</span><strong>No previous sign-ins</strong><p>Access activity will appear here after the first recorded event.</p></div>}</div>}
+            {activeTab === "history" && <div className="profile-history"><div className="profile-tab-heading"><p className="eyebrow">Last 24 hours</p><h3>Scan locations</h3><div className="profile-history-summary"><span>{recentEvents.length} scan{recentEvents.length === 1 ? "" : "s"}</span><span>{recentLocations} location{recentLocations === 1 ? "" : "s"}</span></div></div>{recentEvents.length > 0 ? <div className="profile-history-list">{recentEvents.map((event) => <article key={event.id}><span className={`history-mark ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"}</span><div><strong>{event.zoneName ?? event.zoneId}</strong><small>{event.decision === "GRANTED" ? "Access granted" : "Access denied"}</small></div><time><b>{formatDate(event.occurredAt)}</b><small>{formatTime(event.occurredAt)}</small></time></article>)}</div> : <div className="profile-empty"><span>⌁</span><strong>No scans in the last 24 hours</strong><p>Recent scan locations will appear here after a recorded event.</p></div>}</div>}
             {activeTab === "contact" && <div className="profile-contact"><div className="profile-tab-heading"><p className="eyebrow">Directory details</p><h3>Contact</h3></div><dl><div><dt>Company</dt><dd>{organization?.name ?? person.organizationName}</dd></div><div><dt>Point of contact</dt><dd>{organization?.contactName || "Not provided"}</dd></div><div><dt>Point-of-contact phone</dt><dd>{organization?.contactPhone ? <a href={`tel:${organization.contactPhone}`}>{organization.contactPhone}</a> : "Not provided"}</dd></div><div><dt>Person’s phone</dt><dd>{person.phoneNumber ? <a href={`tel:${person.phoneNumber}`}>{person.phoneNumber}</a> : "Not provided"}</dd></div><div><dt>Work email</dt><dd><a href={`mailto:${person.email}`}>{person.email}</a></dd></div></dl></div>}
           </div>
         </section>
@@ -1469,10 +1505,28 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
   );
 }
 
-function AlarmsView({ alarms }: { alarms: Alarm[] }) {
+function AlarmsView({
+  alarms,
+  people,
+  orgMap,
+  assignments,
+  profiles,
+  events,
+  zones,
+}: {
+  alarms: Alarm[];
+  people: Person[];
+  orgMap: Map<string, Organization>;
+  assignments: Assignment[];
+  profiles: Map<string, Profile>;
+  events: AccessEvent[];
+  zones: Map<string, Zone>;
+}) {
   const [search, setSearch] = useState("");
   const [alarmType, setAlarmType] = useState("ALL");
   const [severity, setSeverity] = useState("ALL");
+  const [contextMenu, setContextMenu] = useState<{ personId: string; x: number; y: number } | null>(null);
+  const [profileRequest, setProfileRequest] = useState<{ personId: string; tab: ProfileTab } | null>(null);
   const alarmTypes = Array.from(new Set(alarms.map((alarm) => alarm.alarmType))).sort();
   const filteredAlarms = alarms.filter((alarm) => {
     const needle = search.trim().toLowerCase();
@@ -1481,6 +1535,31 @@ function AlarmsView({ alarms }: { alarms: Alarm[] }) {
     const matchesSeverity = severity === "ALL" || alarm.severity === severity;
     return matchesSearch && matchesType && matchesSeverity;
   });
+  const profilePerson = profileRequest ? people.find((person) => person.id === profileRequest.personId) : undefined;
+
+  useEffect(() => {
+    if (!contextMenu && !profileRequest) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (profileRequest) setProfileRequest(null);
+      else setContextMenu(null);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [contextMenu, profileRequest]);
+
+  function openAlarmMenu(personId: string, x: number, y: number) {
+    setContextMenu({
+      personId,
+      x: Math.max(12, Math.min(x, window.innerWidth - 232)),
+      y: Math.max(12, Math.min(y, window.innerHeight - 140)),
+    });
+  }
+
+  function openPersonProfile(personId: string, tab: ProfileTab) {
+    setContextMenu(null);
+    setProfileRequest({ personId, tab });
+  }
 
   function exportCsv() {
     const header = ["Time", "When", "Who", "What", "Where"];
@@ -1510,19 +1589,50 @@ function AlarmsView({ alarms }: { alarms: Alarm[] }) {
         <span className="result-count">{filteredAlarms.length} alarms</span>
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
+      <div className="alarm-guidance"><span aria-hidden="true">↗</span><p><strong>Person-linked alarm actions</strong> Right-click an alarm to open the customer contact card or review scan locations from the last 24 hours.</p></div>
       <div className="table-wrap">
         <table className="data-table activity-table alarm-table simplified">
           <thead><tr><th>Time</th><th>When</th><th>Who</th><th>What</th><th>Where</th></tr></thead>
-          <tbody>{filteredAlarms.map((alarm) => <tr key={alarm.id}>
+          <tbody>{filteredAlarms.map((alarm) => <tr className={alarm.personId ? "alarm-row person-linked" : "alarm-row"} key={alarm.id} onContextMenu={(event) => {
+            if (!alarm.personId) return;
+            event.preventDefault();
+            openAlarmMenu(alarm.personId, event.clientX, event.clientY);
+          }} title={alarm.personId ? "Right-click for contact and scan history" : undefined}>
             <td><strong className="military-time">{formatTime(alarm.occurredAt)}</strong></td>
             <td><strong>{formatDate(alarm.occurredAt)}</strong><small>{relativeEventTime(alarm.occurredAt)}</small></td>
-            <td><strong>{alarm.personName}</strong><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
+            <td><div className="alarm-person-heading"><strong>{alarm.personName}</strong>{alarm.personId && <button aria-label={`Open profile actions for ${alarm.personName}`} onClick={(event) => {
+              event.stopPropagation();
+              const bounds = event.currentTarget.getBoundingClientRect();
+              openAlarmMenu(alarm.personId!, bounds.right, bounds.bottom + 4);
+            }} type="button">•••</button>}</div><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
             <td><span className={`alarm-pill ${alarm.severity.toLowerCase()}`}><i />{label(alarm.alarmType)}</span><small>{alarm.detail}</small></td>
             <td><strong>{alarm.zoneName}</strong><small>{alarm.source} · {label(alarm.status)}</small></td>
           </tr>)}</tbody>
         </table>
         {filteredAlarms.length === 0 && <div className="activity-empty"><strong>No matching alarms</strong><span>Try a different search or filter.</span></div>}
       </div>
+      {contextMenu && <div className="alarm-context-layer" onMouseDown={() => setContextMenu(null)}>
+        <div aria-label="Alarm profile actions" className="alarm-context-menu" onMouseDown={(event) => event.stopPropagation()} role="menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <p>Customer record</p>
+          <button onClick={() => openPersonProfile(contextMenu.personId, "contact")} role="menuitem" type="button"><span aria-hidden="true">◎</span><span><strong>Open contact card</strong><small>Phone, email, and company</small></span></button>
+          <button onClick={() => openPersonProfile(contextMenu.personId, "history")} role="menuitem" type="button"><span aria-hidden="true">⌁</span><span><strong>View 24-hour scans</strong><small>Recent doors and locations</small></span></button>
+        </div>
+      </div>}
+      {profilePerson && profileRequest && <div className="drawer-backdrop alarm-profile-backdrop" onMouseDown={() => setProfileRequest(null)}>
+        <section aria-label={`${profilePerson.firstName} ${profilePerson.lastName} alarm profile`} className="alarm-profile-dialog" onMouseDown={(event) => event.stopPropagation()}>
+          <header><div><p className="eyebrow">Alarm-linked customer record</p><h2>{profileRequest.tab === "history" ? "Recent scan locations" : "Contact card"}</h2></div><button aria-label="Close alarm profile" className="close-button" onClick={() => setProfileRequest(null)} type="button">×</button></header>
+          <PersonProfileCard
+            key={`${profilePerson.id}-${profileRequest.tab}`}
+            person={profilePerson}
+            organization={orgMap.get(profilePerson.organizationId)}
+            assignments={assignments.filter((assignment) => assignment.personId === profilePerson.id && assignment.status === "ACTIVE")}
+            profiles={profiles}
+            events={events.filter((event) => event.personId === profilePerson.id)}
+            zones={zones}
+            initialTab={profileRequest.tab}
+          />
+        </section>
+      </div>}
     </section>
   );
 }
