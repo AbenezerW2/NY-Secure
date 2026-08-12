@@ -175,9 +175,11 @@ const DASHBOARD_WIDGETS: { id: DashboardWidget; label: string; description: stri
   { id: "roster", label: "On-site roster", description: "Currently active people and access" },
 ];
 
-const NAV_GROUPS: { label: string; items: { id: View; label: string; symbol: string }[] }[] = [
+const NAV_GROUPS: { label: string; symbol: string; description: string; items: { id: View; label: string; symbol: string }[] }[] = [
   {
     label: "Workspace",
+    symbol: "WS",
+    description: "Facility and policy tools",
     items: [
       { id: "overview", label: "Overview", symbol: "OV" },
       { id: "operations", label: "Live operations", symbol: "OP" },
@@ -187,6 +189,8 @@ const NAV_GROUPS: { label: string; items: { id: View; label: string; symbol: str
   },
   {
     label: "Customer data",
+    symbol: "CD",
+    description: "People, companies, and visits",
     items: [
       { id: "people", label: "People", symbol: "PE" },
       { id: "organizations", label: "Organizations", symbol: "OR" },
@@ -195,6 +199,8 @@ const NAV_GROUPS: { label: string; items: { id: View; label: string; symbol: str
   },
   {
     label: "Alarm center",
+    symbol: "AC",
+    description: "Locator, alarms, and logs",
     items: [
       { id: "locator", label: "Locator", symbol: "LO" },
       { id: "alarms", label: "Alarms", symbol: "AR" },
@@ -718,6 +724,7 @@ export default function NySecureConsole() {
   }
 
   const viewCopy = VIEW_COPY[activeView];
+  const activeNavGroup = NAV_GROUPS.find((group) => group.items.some((item) => item.id === activeView)) ?? NAV_GROUPS[0];
 
   return (
     <main className="app-shell" data-theme={theme} data-font-size={fontSize} data-density={density}>
@@ -739,27 +746,24 @@ export default function NySecureConsole() {
           Simulation environment
         </div>
 
-        <nav className="primary-nav" aria-label="Primary navigation">
-          {NAV_GROUPS.map((group) => (
-            <div className="nav-group" key={group.label}>
-              <p className="nav-section-label">{group.label}</p>
-              {group.items.map((item) => (
-                <button
-                  className={activeView === item.id ? "nav-item active" : "nav-item"}
-                  key={item.id}
-                  onClick={() => setActiveView(item.id)}
-                  type="button"
-                >
-                  <span className="nav-symbol" aria-hidden="true">{item.symbol}</span>
-                  <span>{item.label}</span>
-                  {item.id === "operations" && <i>LIVE</i>}
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
-
-        <div className="sidebar-spacer" />
+        <div className="sidebar-navigation">
+          <nav className="primary-nav" aria-label={`${activeNavGroup.label} navigation`}>
+            <p className="nav-section-label">{activeNavGroup.label}</p>
+            {activeNavGroup.items.map((item) => (
+              <button
+                aria-current={activeView === item.id ? "page" : undefined}
+                className={activeView === item.id ? "nav-item active" : "nav-item"}
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                type="button"
+              >
+                <span className="nav-symbol" aria-hidden="true">{item.symbol}</span>
+                <span>{item.label}</span>
+                {item.id === "operations" && <i>LIVE</i>}
+              </button>
+            ))}
+          </nav>
+        </div>
         <div className="system-health">
           <div className="health-heading">
             <span>System health</span>
@@ -932,6 +936,17 @@ export default function NySecureConsole() {
           )}
         </div>
       </section>
+
+      <nav className="section-taskbar" aria-label="Main sections">
+        {NAV_GROUPS.map((group) => {
+          const active = group.label === activeNavGroup.label;
+          return <button aria-current={active ? "page" : undefined} className={active ? "active" : ""} key={group.label} onClick={() => setActiveView(group.items[0].id)} type="button">
+            <span className="taskbar-symbol" aria-hidden="true">{group.symbol}</span>
+            <span><strong>{group.label}</strong><small>{group.description}</small></span>
+            <i aria-hidden="true">{active ? "●" : "○"}</i>
+          </button>;
+        })}
+      </nav>
 
       {showAddPerson && data && (
         <AddPersonDialog

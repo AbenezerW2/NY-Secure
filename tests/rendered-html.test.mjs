@@ -3,10 +3,11 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("defines the NY-Secure access-control product experience", async () => {
-  const [layout, consoleSource, initSource] = await Promise.all([
+  const [layout, consoleSource, initSource, styles] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/ny-secure-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/init.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(consoleSource, /Simulation environment/);
@@ -23,6 +24,11 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Filter by alarm type/);
   assert.match(consoleSource, /Customer data/);
   assert.match(consoleSource, /Alarm center/);
+  assert.match(consoleSource, /aria-label="Main sections"/);
+  assert.match(consoleSource, /activeNavGroup/);
+  assert.match(consoleSource, /sidebar-navigation/);
+  assert.match(styles, /\.section-taskbar/);
+  assert.match(styles, /\.sidebar-navigation[\s\S]*overflow-y:\s*auto/);
   assert.match(consoleSource, /Last-known access point/);
   assert.match(consoleSource, /Find a last-known scan/);
   assert.match(consoleSource, /Locate everyone/);
