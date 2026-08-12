@@ -580,6 +580,19 @@ const schemaStatements = [
     explanation TEXT NOT NULL,
     attempted_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS alarms (
+    id TEXT PRIMARY KEY NOT NULL,
+    alarm_type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'MEDIUM' CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    person_id TEXT REFERENCES people(id),
+    actor_label TEXT NOT NULL DEFAULT 'System',
+    zone_id TEXT NOT NULL REFERENCES zones(id),
+    source TEXT NOT NULL DEFAULT 'Access control',
+    detail TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ACKNOWLEDGED', 'CLEARED')),
+    occurred_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   "CREATE INDEX IF NOT EXISTS idx_zones_category_active ON zones(category, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_organization_active ON people(organization_id, active)",
   "CREATE INDEX IF NOT EXISTS idx_people_relationship_type ON people(relationship_type)",
@@ -591,6 +604,9 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS idx_access_events_person_attempted_at ON access_events(person_id, attempted_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_access_events_zone_attempted_at ON access_events(zone_id, attempted_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_access_events_decision_attempted_at ON access_events(decision, attempted_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_alarms_occurred_at ON alarms(occurred_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_alarms_type_status ON alarms(alarm_type, status)",
+  "CREATE INDEX IF NOT EXISTS idx_alarms_zone_occurred_at ON alarms(zone_id, occurred_at DESC)",
 ];
 
 let initializationPromise: Promise<void> | undefined;
@@ -612,6 +628,18 @@ async function seedDatabase(db: D1Database) {
   const now = new Date();
   const validFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const visitorValidUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  // Release the unique slug before inserting the renamed operator record.
+  // Existing installations can still have the former operator ID attached to
+  // this slug, which otherwise makes the upsert below fail before the legacy
+  // people records can be migrated.
+  const legacyOperatorId = "org-atlas";
+  await db
+    .prepare(
+      "UPDATE organizations SET slug = 'ny-secure-legacy', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND slug = 'ny-secure'",
+    )
+    .bind(legacyOperatorId)
+    .run();
 
   await db.batch(
     organizations.map((organization) =>
@@ -641,7 +669,6 @@ async function seedDatabase(db: D1Database) {
   );
 
   // Preserve existing NY-Secure employee records created under the legacy operator ID.
-  const legacyOperatorId = ["org", "at", "las"].join("-");
   await db.batch([
     db.prepare(
       "UPDATE people SET organization_id = 'org-ny-secure', updated_at = CURRENT_TIMESTAMP WHERE organization_id = ?",
@@ -871,6 +898,46 @@ async function seedDatabase(db: D1Database) {
           event.reasonCode,
           event.explanation,
           new Date(now.getTime() - event.minutesAgo * 60 * 1000).toISOString(),
+        ),
+    ),
+  );
+
+  const seededAlarms = [
+    { id: "alarm-seed-001", type: "DOOR_HELD", severity: "HIGH", personId: "person-noah-patel", actor: "Noah Patel", zoneId: "zone-loading-dock", source: "Door contact LD-01", detail: "Loading Dock door remained open beyond the configured 30-second threshold.", status: "ACTIVE", minutesAgo: 4 },
+    { id: "alarm-seed-002", type: "DOOR_FORCED", severity: "CRITICAL", personId: null, actor: "Unknown person", zoneId: "zone-roof", source: "Door contact RF-01", detail: "Roof access opened without a preceding valid credential read.", status: "ACTIVE", minutesAgo: 13 },
+    { id: "alarm-seed-003", type: "UNKNOWN_CARD", severity: "MEDIUM", personId: null, actor: "Unknown credential", zoneId: "zone-main-entrance", source: "Reader EN-01", detail: "Card data could not be matched to an issued NY-Secure credential.", status: "ACKNOWLEDGED", minutesAgo: 28 },
+    { id: "alarm-seed-004", type: "WRONG_DOOR", severity: "MEDIUM", personId: "person-eli-mercer", actor: "Eli Mercer", zoneId: "zone-cage-11010", source: "Reader C11010-01", detail: "The credential is active but has no permission for this door.", status: "ACTIVE", minutesAgo: 46 },
+    { id: "alarm-seed-005", type: "WRONG_TIME", severity: "MEDIUM", personId: "person-caleb-johnson", actor: "Caleb Johnson", zoneId: "zone-janitor-closet", source: "Reader JC-01", detail: "Credential presented outside the assigned access schedule.", status: "CLEARED", minutesAgo: 68 },
+    { id: "alarm-seed-006", type: "EXPIRED_CARD", severity: "HIGH", personId: "person-lena-park", actor: "Lena Park", zoneId: "zone-security-lobby", source: "Reader SL-02", detail: "The presented visitor credential is past its valid-until date.", status: "ACTIVE", minutesAgo: 91 },
+    { id: "alarm-seed-007", type: "INCORRECT_TIME", severity: "LOW", personId: "person-sofia-reyes", actor: "Sofia Reyes", zoneId: "zone-ups-b", source: "Reader UPSB-01", detail: "Reader and controller timestamps differed beyond the allowed tolerance.", status: "ACKNOWLEDGED", minutesAgo: 126 },
+    { id: "alarm-seed-008", type: "MONITORING_POINT_ALARM", severity: "HIGH", personId: null, actor: "Environmental monitoring", zoneId: "zone-generator-east", source: "Monitoring point GEN-E-07", detail: "Generator-room monitoring input changed to an alarm state.", status: "ACTIVE", minutesAgo: 173 },
+    { id: "alarm-seed-009", type: "REPEATED_INVALID_SCAN", severity: "MEDIUM", personId: null, actor: "Unknown credential", zoneId: "zone-entrance-mantrap", source: "Reader MT-01", detail: "Five unreadable or incomplete credential scans occurred within two minutes.", status: "ACTIVE", minutesAgo: 214 },
+  ] as const;
+
+  await db.batch(
+    seededAlarms.map((alarm) =>
+      db
+        .prepare(
+          `INSERT INTO alarms
+            (id, alarm_type, severity, person_id, actor_label, zone_id, source, detail, status, occurred_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             alarm_type = excluded.alarm_type, severity = excluded.severity,
+             person_id = excluded.person_id, actor_label = excluded.actor_label,
+             zone_id = excluded.zone_id, source = excluded.source,
+             detail = excluded.detail, status = excluded.status`,
+        )
+        .bind(
+          alarm.id,
+          alarm.type,
+          alarm.severity,
+          alarm.personId,
+          alarm.actor,
+          alarm.zoneId,
+          alarm.source,
+          alarm.detail,
+          alarm.status,
+          new Date(now.getTime() - alarm.minutesAgo * 60 * 1000).toISOString(),
         ),
     ),
   );

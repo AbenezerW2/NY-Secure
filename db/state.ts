@@ -67,6 +67,21 @@ type EventRow = {
   attemptedAt: string;
 };
 
+type AlarmRow = {
+  id: string;
+  alarmType: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  personId: string | null;
+  actorLabel: string;
+  personName: string | null;
+  zoneId: string;
+  zoneName: string;
+  source: string;
+  detail: string;
+  status: "ACTIVE" | "ACKNOWLEDGED" | "CLEARED";
+  occurredAt: string;
+};
+
 type CountRow = {
   totalPeople: number;
   activePeople: number;
@@ -85,6 +100,7 @@ export async function getState(db: D1Database) {
     ruleResult,
     assignmentResult,
     eventResult,
+    alarmResult,
     countResult,
   ] = await Promise.all([
     db
@@ -182,6 +198,22 @@ export async function getState(db: D1Database) {
     db
       .prepare(
         `SELECT
+          a.id, a.alarm_type AS alarmType, a.severity,
+          a.person_id AS personId,
+          COALESCE(pe.first_name || ' ' || pe.last_name, a.actor_label) AS personName,
+          a.actor_label AS actorLabel, a.zone_id AS zoneId,
+          z.name AS zoneName, a.source, a.detail, a.status,
+          a.occurred_at AS occurredAt
+         FROM alarms a
+         JOIN zones z ON z.id = a.zone_id
+         LEFT JOIN people pe ON pe.id = a.person_id
+         ORDER BY a.occurred_at DESC
+         LIMIT 100`,
+      )
+      .all<AlarmRow>(),
+    db
+      .prepare(
+        `SELECT
           (SELECT COUNT(*) FROM people) AS totalPeople,
           (SELECT COUNT(*) FROM people WHERE active = 1) AS activePeople,
           (SELECT COUNT(*) FROM access_assignments a
@@ -259,6 +291,7 @@ export async function getState(db: D1Database) {
     profiles,
     assignments,
     events: eventResult.results,
+    alarms: alarmResult.results,
     stats: {
       organizationCount: organizations.filter((organization) => organization.active)
         .length,

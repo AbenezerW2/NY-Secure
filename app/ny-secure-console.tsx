@@ -10,6 +10,7 @@ type View =
   | "organizations"
   | "policies"
   | "facility"
+  | "alarms"
   | "activity";
 
 type Organization = {
@@ -83,6 +84,20 @@ type AccessEvent = {
   explanation?: string;
 };
 
+type Alarm = {
+  id: string;
+  occurredAt: string;
+  alarmType: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  personId?: string | null;
+  personName: string;
+  zoneId: string;
+  zoneName: string;
+  source: string;
+  detail: string;
+  status: "ACTIVE" | "ACKNOWLEDGED" | "CLEARED";
+};
+
 type StatePayload = {
   organizations: Organization[];
   zones: Zone[];
@@ -90,6 +105,7 @@ type StatePayload = {
   profiles: Profile[];
   assignments: Assignment[];
   events: AccessEvent[];
+  alarms: Alarm[];
   stats?: {
     activePeople?: number;
     activeCredentials?: number;
@@ -119,6 +135,7 @@ const NAV_ITEMS: { id: View; label: string; symbol: string }[] = [
   { id: "organizations", label: "Organizations", symbol: "OR" },
   { id: "policies", label: "Access policies", symbol: "AP" },
   { id: "facility", label: "Facility", symbol: "FC" },
+  { id: "alarms", label: "Alarms", symbol: "AR" },
   { id: "activity", label: "Activity log", symbol: "AL" },
 ];
 
@@ -170,6 +187,11 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; subtitle: string
     eyebrow: "NY-Secure · DC-01",
     title: "Facility model",
     subtitle: "A navigable hierarchy of perimeter, common, tenant, and critical spaces.",
+  },
+  alarms: {
+    eyebrow: "Security exceptions",
+    title: "Alarms",
+    subtitle: "Door, credential, schedule, and monitoring-point alarms in a dedicated report.",
   },
   activity: {
     eyebrow: "Immutable history",
@@ -228,6 +250,7 @@ function normalizeState(source: {
   profiles?: Array<Record<string, unknown>>;
   assignments?: Array<Record<string, unknown>>;
   events?: Array<Record<string, unknown>>;
+  alarms?: Array<Record<string, unknown>>;
   stats?: Record<string, unknown>;
 }): StatePayload {
   const organizations: Organization[] = (source.organizations ?? []).map((item) => ({
@@ -340,6 +363,19 @@ function normalizeState(source: {
       explanation: item.explanation ? String(item.explanation) : undefined,
     };
   });
+  const alarms: Alarm[] = (source.alarms ?? []).map((item) => ({
+    id: String(item.id),
+    occurredAt: String(item.occurredAt),
+    alarmType: String(item.alarmType ?? "UNKNOWN_ALARM"),
+    severity: (["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(String(item.severity)) ? String(item.severity) : "MEDIUM") as Alarm["severity"],
+    personId: item.personId ? String(item.personId) : null,
+    personName: String(item.personName ?? item.actorLabel ?? "System"),
+    zoneId: String(item.zoneId),
+    zoneName: String(item.zoneName ?? "Unknown location"),
+    source: String(item.source ?? "Access control"),
+    detail: String(item.detail ?? "Alarm condition detected."),
+    status: (["ACTIVE", "ACKNOWLEDGED", "CLEARED"].includes(String(item.status)) ? String(item.status) : "ACTIVE") as Alarm["status"],
+  }));
   return {
     organizations,
     zones,
@@ -347,6 +383,7 @@ function normalizeState(source: {
     profiles,
     assignments,
     events,
+    alarms,
     stats: {
       activePeople: Number(source.stats?.activePeople ?? people.filter((person) => person.status === "ACTIVE").length),
       activeCredentials: people.filter((person) => person.badgeStatus === "ACTIVE").length,
@@ -363,7 +400,7 @@ export default function NySecureConsole() {
   const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [flash, setFlash] = useState<Flash>(null);
-  const [clock, setClock] = useState(new Date());
+  const [clock, setClock] = useState<Date | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState("zone-cage-11000");
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [simulationZoneId, setSimulationZoneId] = useState("zone-cage-11000");
@@ -401,9 +438,11 @@ export default function NySecureConsole() {
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadState(), 0);
+    const initialClock = window.setTimeout(() => setClock(new Date()), 0);
     const timer = window.setInterval(() => setClock(new Date()), 1000);
     return () => {
       window.clearTimeout(initialLoad);
+      window.clearTimeout(initialClock);
       window.clearInterval(timer);
     };
   }, [loadState]);
@@ -622,7 +661,7 @@ export default function NySecureConsole() {
           </label>
           <div className="topbar-time">
             <small>America / New York</small>
-            <strong>{clock.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</strong>
+            <strong>{clock?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "America/New_York" }) ?? "--:--:--"}</strong>
           </div>
           <button className="theme-toggle" onClick={toggleTheme} type="button" aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
             <span aria-hidden="true">{theme === "light" ? "☾" : "☀"}</span>
@@ -721,6 +760,7 @@ export default function NySecureConsole() {
                   setSelectedZoneId={setSelectedZoneId}
                 />
               )}
+              {activeView === "alarms" && <AlarmsView alarms={data.alarms} />}
               {activeView === "activity" && <ActivityView events={data.events} />}
             </>
           )}
@@ -1312,6 +1352,64 @@ function FacilityView({ zones, selectedZone, selectedZoneId, setSelectedZoneId }
   );
 }
 
+function AlarmsView({ alarms }: { alarms: Alarm[] }) {
+  const [search, setSearch] = useState("");
+  const [alarmType, setAlarmType] = useState("ALL");
+  const [severity, setSeverity] = useState("ALL");
+  const alarmTypes = Array.from(new Set(alarms.map((alarm) => alarm.alarmType))).sort();
+  const filteredAlarms = alarms.filter((alarm) => {
+    const needle = search.trim().toLowerCase();
+    const matchesSearch = !needle || [alarm.personName, alarm.alarmType, alarm.zoneName, alarm.source, alarm.detail].join(" ").toLowerCase().includes(needle);
+    const matchesType = alarmType === "ALL" || alarm.alarmType === alarmType;
+    const matchesSeverity = severity === "ALL" || alarm.severity === severity;
+    return matchesSearch && matchesType && matchesSeverity;
+  });
+
+  function exportCsv() {
+    const header = ["Time", "When", "Who", "What", "Where"];
+    const rows = filteredAlarms.map((alarm) => [
+      formatTime(alarm.occurredAt),
+      formatDate(alarm.occurredAt),
+      alarm.personName,
+      label(alarm.alarmType),
+      alarm.zoneName,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = "ny-secure-alarms.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  return (
+    <section className="panel directory-panel alarms-panel">
+      <div className="directory-toolbar activity-toolbar alarms-toolbar">
+        <label className="table-search"><span>⌕</span><input aria-label="Search alarms" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search alarms, people, or locations…" /></label>
+        <div className="toolbar-filters">
+          <select aria-label="Filter by alarm type" value={alarmType} onChange={(event) => setAlarmType(event.target.value)}><option value="ALL">All alarm types</option>{alarmTypes.map((item) => <option value={item} key={item}>{label(item)}</option>)}</select>
+          <select aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
+        </div>
+        <span className="result-count">{filteredAlarms.length} alarms</span>
+        <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
+      </div>
+      <div className="table-wrap">
+        <table className="data-table activity-table alarm-table simplified">
+          <thead><tr><th>Time</th><th>When</th><th>Who</th><th>What</th><th>Where</th></tr></thead>
+          <tbody>{filteredAlarms.map((alarm) => <tr key={alarm.id}>
+            <td><strong className="military-time">{formatTime(alarm.occurredAt)}</strong></td>
+            <td><strong>{formatDate(alarm.occurredAt)}</strong><small>{relativeEventTime(alarm.occurredAt)}</small></td>
+            <td><strong>{alarm.personName}</strong><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
+            <td><span className={`alarm-pill ${alarm.severity.toLowerCase()}`}><i />{label(alarm.alarmType)}</span><small>{alarm.detail}</small></td>
+            <td><strong>{alarm.zoneName}</strong><small>{alarm.source} · {label(alarm.status)}</small></td>
+          </tr>)}</tbody>
+        </table>
+        {filteredAlarms.length === 0 && <div className="activity-empty"><strong>No matching alarms</strong><span>Try a different search or filter.</span></div>}
+      </div>
+    </section>
+  );
+}
+
 function ActivityView({ events }: { events: AccessEvent[] }) {
   const [search, setSearch] = useState("");
   const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED">("ALL");
@@ -1412,12 +1510,12 @@ function SettingsDrawer({
 }
 
 function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayload; onClose: () => void }) {
-  const config: Record<StatTab, { eyebrow: string; title: string; description: string }> = {
+  const config = ({
     people: { eyebrow: "Live occupancy", title: "People on site", description: "Current badge-ins and last verified locations." },
     credentials: { eyebrow: "Credential health", title: "Active credentials", description: "Issued badges that can currently be evaluated at a reader." },
     grants: { eyebrow: "Decision log", title: "Access granted", description: "Successful access decisions recorded today." },
     denials: { eyebrow: "Review queue", title: "Access denied", description: "Denied attempts requiring security awareness or review." },
-  }[tab];
+  } satisfies Record<StatTab, { eyebrow: string; title: string; description: string }>)[tab];
   const eventRows = data.events.filter((event) => tab === "grants" ? event.decision === "GRANTED" : event.decision === "DENIED");
   const personRows = data.people.filter((person) => tab === "credentials" ? person.badgeStatus === "ACTIVE" : person.status === "ACTIVE");
   const count = tab === "grants" || tab === "denials" ? eventRows.length : personRows.length;

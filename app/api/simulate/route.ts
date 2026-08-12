@@ -135,6 +135,34 @@ export async function POST(request: Request) {
       )
       .run();
 
+    if (decision === "DENIED") {
+      const alarmType = {
+        ZONE_NOT_PERMITTED: "WRONG_DOOR",
+        NO_ACTIVE_ASSIGNMENT: "EXPIRED_CARD",
+        PERSON_INACTIVE: "EXPIRED_CARD",
+        ZONE_INACTIVE: "MONITORING_POINT_ALARM",
+      }[reasonCode] ?? "UNKNOWN_CARD";
+      const severity = reasonCode === "ZONE_INACTIVE" ? "HIGH" : "MEDIUM";
+      await db
+        .prepare(
+          `INSERT INTO alarms
+            (id, alarm_type, severity, person_id, actor_label, zone_id, source, detail, status, occurred_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
+        )
+        .bind(
+          `alarm-${crypto.randomUUID()}`,
+          alarmType,
+          severity,
+          personId,
+          person.name,
+          zoneId,
+          `${zone.name} reader`,
+          explanation,
+          now,
+        )
+        .run();
+    }
+
     const event = {
       id: eventId,
       personId,
@@ -161,4 +189,3 @@ export async function POST(request: Request) {
     return apiErrorResponse(error);
   }
 }
-

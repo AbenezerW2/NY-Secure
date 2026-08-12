@@ -3,9 +3,10 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("defines the NY-Secure access-control product experience", async () => {
-  const [layout, consoleSource] = await Promise.all([
+  const [layout, consoleSource, initSource] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/ny-secure-console.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/init.ts", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(consoleSource, /Simulation environment/);
@@ -16,6 +17,10 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Start with a clean canvas/);
   assert.match(consoleSource, /Open display and dashboard settings/);
   assert.match(consoleSource, /Time<\/th><th>Who<\/th><th>What<\/th><th>Where<\/th><th>When/);
+  assert.match(consoleSource, /Time<\/th><th>When<\/th><th>Who<\/th><th>What<\/th><th>Where/);
+  assert.match(initSource, /DOOR_HELD/);
+  assert.match(initSource, /MONITORING_POINT_ALARM/);
+  assert.match(consoleSource, /Filter by alarm type/);
   assert.match(consoleSource, /hour12:\s*false/);
   assert.match(consoleSource, /Simulate access/);
   assert.match(consoleSource, /Search by first name, last name, OID, or company/);
@@ -66,6 +71,7 @@ test("ships durable access-control capabilities instead of starter artifacts", a
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(schema, /accessAssignments/);
   assert.match(schema, /accessEvents/);
+  assert.match(schema, /export const alarms/);
   assert.match(schema, /phoneNumber:\s*text\("phone_number"\)/);
   assert.match(schema, /ibxAccessPin:\s*text\("ibx_access_pin"\)/);
   assert.match(schema, /creditHold:\s*integer\("credit_hold"/);
