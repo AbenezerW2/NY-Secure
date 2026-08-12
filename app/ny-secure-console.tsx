@@ -10,6 +10,7 @@ type View =
   | "organizations"
   | "policies"
   | "facility"
+  | "visits"
   | "alarms"
   | "activity";
 
@@ -98,6 +99,27 @@ type Alarm = {
   status: "ACTIVE" | "ACKNOWLEDGED" | "CLEARED";
 };
 
+type ScheduledVisit = {
+  ticketNumber: string;
+  siteCode: string;
+  organizationId: string;
+  organizationName: string;
+  requesterName: string;
+  visitorName: string;
+  visitorEmail?: string | null;
+  visitorPhone?: string | null;
+  cageZoneId: string;
+  cageName: string;
+  cabinetAccess: string[];
+  validFrom: string;
+  validUntil: string;
+  comments: string;
+  hasDelivery: boolean;
+  packageCount: number;
+  packageDetails: string;
+  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+};
+
 type StatePayload = {
   organizations: Organization[];
   zones: Zone[];
@@ -106,6 +128,7 @@ type StatePayload = {
   assignments: Assignment[];
   events: AccessEvent[];
   alarms: Alarm[];
+  scheduledVisits: ScheduledVisit[];
   stats?: {
     activePeople?: number;
     activeCredentials?: number;
@@ -135,6 +158,7 @@ const NAV_ITEMS: { id: View; label: string; symbol: string }[] = [
   { id: "organizations", label: "Organizations", symbol: "OR" },
   { id: "policies", label: "Access policies", symbol: "AP" },
   { id: "facility", label: "Facility", symbol: "FC" },
+  { id: "visits", label: "Scheduled visits", symbol: "SV" },
   { id: "alarms", label: "Alarms", symbol: "AR" },
   { id: "activity", label: "Activity log", symbol: "AL" },
 ];
@@ -187,6 +211,11 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; subtitle: string
     eyebrow: "NY-Secure · DC-01",
     title: "Facility model",
     subtitle: "A navigable hierarchy of perimeter, common, tenant, and critical spaces.",
+  },
+  visits: {
+    eyebrow: "Temporary access",
+    title: "Scheduled visits",
+    subtitle: "Create time-bound work-visit tickets for customer and NOC-sponsored visitors.",
   },
   alarms: {
     eyebrow: "Security exceptions",
@@ -251,6 +280,7 @@ function normalizeState(source: {
   assignments?: Array<Record<string, unknown>>;
   events?: Array<Record<string, unknown>>;
   alarms?: Array<Record<string, unknown>>;
+  scheduledVisits?: Array<Record<string, unknown>>;
   stats?: Record<string, unknown>;
 }): StatePayload {
   const organizations: Organization[] = (source.organizations ?? []).map((item) => ({
@@ -376,6 +406,26 @@ function normalizeState(source: {
     detail: String(item.detail ?? "Alarm condition detected."),
     status: (["ACTIVE", "ACKNOWLEDGED", "CLEARED"].includes(String(item.status)) ? String(item.status) : "ACTIVE") as Alarm["status"],
   }));
+  const scheduledVisits: ScheduledVisit[] = (source.scheduledVisits ?? []).map((item) => ({
+    ticketNumber: String(item.ticketNumber),
+    siteCode: String(item.siteCode ?? "DC-01"),
+    organizationId: String(item.organizationId),
+    organizationName: String(item.organizationName ?? "Unknown organization"),
+    requesterName: String(item.requesterName ?? "NOC"),
+    visitorName: String(item.visitorName),
+    visitorEmail: item.visitorEmail ? String(item.visitorEmail) : null,
+    visitorPhone: item.visitorPhone ? String(item.visitorPhone) : null,
+    cageZoneId: String(item.cageZoneId),
+    cageName: String(item.cageName ?? "Customer cage"),
+    cabinetAccess: Array.isArray(item.cabinetAccess) ? item.cabinetAccess.map(String) : [],
+    validFrom: String(item.validFrom),
+    validUntil: String(item.validUntil),
+    comments: String(item.comments ?? ""),
+    hasDelivery: item.hasDelivery === true,
+    packageCount: Number(item.packageCount ?? 0),
+    packageDetails: String(item.packageDetails ?? ""),
+    status: (["SCHEDULED", "ACTIVE", "EXPIRED", "CANCELLED"].includes(String(item.status)) ? String(item.status) : "SCHEDULED") as ScheduledVisit["status"],
+  }));
   return {
     organizations,
     zones,
@@ -384,6 +434,7 @@ function normalizeState(source: {
     assignments,
     events,
     alarms,
+    scheduledVisits,
     stats: {
       activePeople: Number(source.stats?.activePeople ?? people.filter((person) => person.status === "ACTIVE").length),
       activeCredentials: people.filter((person) => person.badgeStatus === "ACTIVE").length,
@@ -418,6 +469,7 @@ export default function NySecureConsole() {
   } | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [showAddPerson, setShowAddPerson] = useState(false);
+  const [showCreateVisit, setShowCreateVisit] = useState(false);
 
   const loadState = useCallback(async () => {
     setLoading(true);
@@ -693,7 +745,12 @@ export default function NySecureConsole() {
                   <span>＋</span> Add person
                 </button>
               )}
-              {activeView !== "people" && activeView !== "operations" && (
+              {activeView === "visits" && (
+                <button className="primary-button" onClick={() => setShowCreateVisit(true)} type="button">
+                  <span>＋</span> Create visit ticket
+                </button>
+              )}
+              {activeView !== "people" && activeView !== "operations" && activeView !== "visits" && (
                 <button className="primary-button" onClick={() => setActiveView("operations")} type="button">
                   <span className="button-reader-icon" /> Simulate access
                 </button>
@@ -760,6 +817,7 @@ export default function NySecureConsole() {
                   setSelectedZoneId={setSelectedZoneId}
                 />
               )}
+              {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} />}
               {activeView === "alarms" && <AlarmsView alarms={data.alarms} />}
               {activeView === "activity" && <ActivityView events={data.events} />}
             </>
@@ -774,6 +832,18 @@ export default function NySecureConsole() {
           onSaved={async (message) => {
             setShowAddPerson(false);
             setFlash({ tone: "success", message });
+            await loadState();
+          }}
+        />
+      )}
+      {showCreateVisit && data && (
+        <CreateVisitDialog
+          organizations={data.organizations}
+          zones={data.zones}
+          onClose={() => setShowCreateVisit(false)}
+          onSaved={async (ticketNumber) => {
+            setShowCreateVisit(false);
+            setFlash({ tone: "success", message: `${ticketNumber} was created for DC-01.` });
             await loadState();
           }}
         />
@@ -1352,6 +1422,53 @@ function FacilityView({ zones, selectedZone, selectedZoneId, setSelectedZoneId }
   );
 }
 
+function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("ALL");
+  const filteredVisits = visits.filter((visit) => {
+    const needle = search.trim().toLowerCase();
+    const matchesSearch = !needle || [visit.ticketNumber, visit.visitorName, visit.organizationName, visit.requesterName, visit.cageName, visit.cabinetAccess.join(" "), visit.comments, visit.packageDetails].join(" ").toLowerCase().includes(needle);
+    return matchesSearch && (status === "ALL" || visit.status === status);
+  });
+  const scheduledCount = visits.filter((visit) => visit.status === "SCHEDULED").length;
+  const activeCount = visits.filter((visit) => visit.status === "ACTIVE").length;
+  const deliveryCount = visits.filter((visit) => visit.hasDelivery && visit.status !== "EXPIRED" && visit.status !== "CANCELLED").length;
+
+  return (
+    <div className="visits-workspace">
+      <div className="visit-summary-grid">
+        <article className="panel visit-summary-card"><span>Upcoming</span><strong>{scheduledCount}</strong><small>Scheduled visit tickets</small></article>
+        <article className="panel visit-summary-card active"><span>On site now</span><strong>{activeCount}</strong><small>Tickets in their valid window</small></article>
+        <article className="panel visit-summary-card delivery"><span>Deliveries</span><strong>{deliveryCount}</strong><small>Upcoming package arrivals</small></article>
+      </div>
+      <section className="panel directory-panel visits-panel">
+        <div className="directory-toolbar activity-toolbar visits-toolbar">
+          <label className="table-search"><span>⌕</span><input aria-label="Search scheduled visits" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search ticket, visitor, customer, cage, or cabinet…" /></label>
+          <div className="toolbar-filters visit-filters">
+            <select aria-label="Filter visits by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">All statuses</option><option value="SCHEDULED">Scheduled</option><option value="ACTIVE">Active</option><option value="EXPIRED">Expired</option><option value="CANCELLED">Cancelled</option></select>
+          </div>
+          <span className="result-count">{filteredVisits.length} tickets</span>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table visits-table">
+            <thead><tr><th>Ticket</th><th>Visitor</th><th>Customer / requester</th><th>Cage & cabinets</th><th>Valid window</th><th>Delivery</th><th>Status</th></tr></thead>
+            <tbody>{filteredVisits.map((visit) => <tr key={visit.ticketNumber}>
+              <td><strong className="ticket-number">{visit.ticketNumber}</strong><small>{visit.siteCode}</small>{visit.comments && <small title={visit.comments}>Comment added</small>}</td>
+              <td><strong>{visit.visitorName}</strong><small>{visit.visitorEmail || visit.visitorPhone || "Contact not provided"}</small></td>
+              <td><strong>{visit.organizationName}</strong><small>{visit.requesterName}</small></td>
+              <td><strong>{visit.cageName}</strong><div className="cabinet-tags">{visit.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</div></td>
+              <td><strong>{formatDate(visit.validFrom)} · {formatTime(visit.validFrom)}</strong><small>Until {formatDate(visit.validUntil)} · {formatTime(visit.validUntil)}</small></td>
+              <td>{visit.hasDelivery ? <><strong>{visit.packageCount} package{visit.packageCount === 1 ? "" : "s"}</strong><small>{visit.packageDetails || "Package delivery"}</small></> : <span className="no-delivery">None</span>}</td>
+              <td><span className={`visit-status ${visit.status.toLowerCase()}`}><i />{label(visit.status)}</span></td>
+            </tr>)}</tbody>
+          </table>
+          {filteredVisits.length === 0 && <div className="activity-empty"><strong>No matching visit tickets</strong><span>Try another search or status filter.</span></div>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function AlarmsView({ alarms }: { alarms: Alarm[] }) {
   const [search, setSearch] = useState("");
   const [alarmType, setAlarmType] = useState("ALL");
@@ -1545,6 +1662,65 @@ function StatLogDrawer({ tab, data, onClose }: { tab: StatTab; data: StatePayloa
           {count === 0 && <div className="empty-log"><span>✓</span><strong>No records in this log</strong><p>The live security feed is clear.</p></div>}
         </div>
       </aside>
+    </div>
+  );
+}
+
+function CreateVisitDialog({ organizations, zones, onClose, onSaved }: { organizations: Organization[]; zones: Zone[]; onClose: () => void; onSaved: (ticketNumber: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [hasDelivery, setHasDelivery] = useState(false);
+  const [defaultStart] = useState(() => {
+    const date = new Date(Date.now() + 60 * 60 * 1000);
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+  });
+  const requesters = organizations.filter((organization) => organization.status === "ACTIVE" && ["DATA_CENTER_OPERATOR", "COLOCATION_CUSTOMER"].includes(organization.type));
+  const cages = zones.filter((zone) => zone.type === "CAGE" && zone.status === "ONLINE");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      const response = await fetch("/api/visits", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...values, hasDelivery }),
+      });
+      const result = (await response.json()) as { ticketNumber?: string; error?: string };
+      if (!response.ok || !result.ticketNumber) throw new Error(result.error || "Visit ticket could not be created.");
+      onSaved(result.ticketNumber);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Visit ticket could not be created.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <form className="modal visit-modal" onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header"><div><p className="eyebrow">DC-01 temporary access</p><h2>Create work-visit ticket</h2><p>Schedule limited cage and cabinet access without issuing permanent access.</p></div><button className="close-button" onClick={onClose} type="button" aria-label="Close visit ticket form">×</button></div>
+        <div className="ticket-prefix-preview"><span>Ticket format</span><strong>01-XXXXXX</strong><small>Generated automatically for DC-01</small></div>
+        <div className="form-grid visit-form-grid">
+          <label className="full-field"><span>Customer / requesting organization</span><select name="organizationId" required defaultValue={requesters[0]?.id}>{requesters.map((organization) => <option value={organization.id} key={organization.id}>{organization.name}</option>)}</select></label>
+          <label className="full-field"><span>Requested by</span><input name="requesterName" required maxLength={120} placeholder="Name and team, e.g. Jordan Lee · Customer NOC" /></label>
+          <label><span>Visitor name</span><input name="visitorName" required maxLength={120} placeholder="Full legal name" /></label>
+          <label><span>Visitor email</span><input type="email" name="visitorEmail" maxLength={254} placeholder="visitor@company.com" /></label>
+          <label className="full-field"><span>Visitor phone (optional)</span><input type="tel" name="visitorPhone" maxLength={40} placeholder="+1 212 555 0100" /></label>
+          <label className="full-field"><span>Customer cage</span><select name="cageZoneId" required defaultValue={cages[0]?.id}>{cages.map((cage) => <option value={cage.id} key={cage.id}>{cage.name}</option>)}</select></label>
+          <label className="full-field"><span>Authorized cabinets</span><input name="cabinets" required maxLength={700} placeholder="CAB-11001, CAB-11002" /><small>Separate multiple cabinets with commas.</small></label>
+          <label><span>Visit starts</span><input type="datetime-local" name="validFrom" required defaultValue={defaultStart} /></label>
+          <label><span>Valid for</span><select name="durationHours" defaultValue="4"><option value="1">1 hour</option><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option></select></label>
+          <label className="full-field"><span>Comments (optional)</span><textarea name="comments" maxLength={1000} rows={3} placeholder="Escort instructions, work scope, contacts, or restrictions…" /></label>
+          <label className="full-field visit-delivery-toggle"><input type="checkbox" checked={hasDelivery} onChange={(event) => setHasDelivery(event.target.checked)} /><span><strong>Package delivery included</strong><small>Capture package count and delivery notes for receiving.</small></span></label>
+          {hasDelivery && <><label><span>Number of packages</span><input type="number" name="packageCount" required min="1" max="999" defaultValue="1" /></label><label><span>Package details</span><input name="packageDetails" maxLength={500} placeholder="e.g. Two sealed server cartons" /></label></>}
+        </div>
+        <div className="info-callout"><span>i</span><p>The ticket becomes active only during its approved window and grants access only to the selected cage and listed cabinets.</p></div>
+        {error && <p className="form-error">{error}</p>}
+        <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Cancel</button><button className="primary-button" disabled={saving || requesters.length === 0 || cages.length === 0} type="submit">{saving ? "Creating…" : "Create ticket"}</button></div>
+      </form>
     </div>
   );
 }

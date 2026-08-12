@@ -82,6 +82,28 @@ type AlarmRow = {
   occurredAt: string;
 };
 
+type ScheduledVisitRow = {
+  ticketNumber: string;
+  siteCode: string;
+  organizationId: string;
+  organizationName: string;
+  requesterName: string;
+  visitorName: string;
+  visitorEmail: string | null;
+  visitorPhone: string | null;
+  cageZoneId: string;
+  cageName: string;
+  cabinetAccess: string;
+  validFrom: string;
+  validUntil: string;
+  comments: string;
+  hasDelivery: number | boolean;
+  packageCount: number;
+  packageDetails: string;
+  status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+  createdAt: string;
+};
+
 type CountRow = {
   totalPeople: number;
   activePeople: number;
@@ -101,6 +123,7 @@ export async function getState(db: D1Database) {
     assignmentResult,
     eventResult,
     alarmResult,
+    visitResult,
     countResult,
   ] = await Promise.all([
     db
@@ -214,6 +237,33 @@ export async function getState(db: D1Database) {
     db
       .prepare(
         `SELECT
+          v.ticket_number AS ticketNumber, v.site_code AS siteCode,
+          v.organization_id AS organizationId, o.name AS organizationName,
+          v.requester_name AS requesterName, v.visitor_name AS visitorName,
+          v.visitor_email AS visitorEmail, v.visitor_phone AS visitorPhone,
+          v.cage_zone_id AS cageZoneId, z.name AS cageName,
+          v.cabinet_access AS cabinetAccess, v.valid_from AS validFrom,
+          v.valid_until AS validUntil, v.comments,
+          v.has_delivery AS hasDelivery, v.package_count AS packageCount,
+          v.package_details AS packageDetails,
+          CASE
+            WHEN v.status = 'CANCELLED' THEN 'CANCELLED'
+            WHEN datetime(v.valid_until) < datetime(?) THEN 'EXPIRED'
+            WHEN datetime(v.valid_from) <= datetime(?) THEN 'ACTIVE'
+            ELSE 'SCHEDULED'
+          END AS status,
+          v.created_at AS createdAt
+         FROM scheduled_visits v
+         JOIN organizations o ON o.id = v.organization_id
+         JOIN zones z ON z.id = v.cage_zone_id
+         ORDER BY v.valid_from DESC
+         LIMIT 100`,
+      )
+      .bind(now, now)
+      .all<ScheduledVisitRow>(),
+    db
+      .prepare(
+        `SELECT
           (SELECT COUNT(*) FROM people) AS totalPeople,
           (SELECT COUNT(*) FROM people WHERE active = 1) AS activePeople,
           (SELECT COUNT(*) FROM access_assignments a
@@ -274,6 +324,20 @@ export async function getState(db: D1Database) {
       })),
     };
   });
+  const scheduledVisits = visitResult.results.map((visit) => {
+    let cabinetAccess: string[] = [];
+    try {
+      const parsed = JSON.parse(visit.cabinetAccess) as unknown;
+      if (Array.isArray(parsed)) cabinetAccess = parsed.map(String);
+    } catch {
+      cabinetAccess = visit.cabinetAccess.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+    return {
+      ...visit,
+      cabinetAccess,
+      hasDelivery: asBoolean(visit.hasDelivery),
+    };
+  });
 
   const count = countResult ?? {
     totalPeople: people.length,
@@ -292,6 +356,7 @@ export async function getState(db: D1Database) {
     assignments,
     events: eventResult.results,
     alarms: alarmResult.results,
+    scheduledVisits,
     stats: {
       organizationCount: organizations.filter((organization) => organization.active)
         .length,
