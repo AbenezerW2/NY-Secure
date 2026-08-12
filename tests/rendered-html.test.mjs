@@ -25,6 +25,9 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Customer data/);
   assert.match(consoleSource, /Alarm center/);
   assert.match(consoleSource, /aria-label="Main sections"/);
+  assert.match(consoleSource, /taskbar-profile/);
+  assert.match(consoleSource, /Open Maya Brooks operator profile/);
+  assert.doesNotMatch(consoleSource, /operator-card/);
   assert.match(consoleSource, /activeNavGroup/);
   assert.match(consoleSource, /sidebar-navigation/);
   assert.match(styles, /\.section-taskbar/);

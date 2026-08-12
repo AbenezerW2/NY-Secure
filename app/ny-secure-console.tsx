@@ -778,14 +778,6 @@ export default function NySecureConsole() {
             <b>4 / 4</b>
           </div>
         </div>
-        <button className="operator-card" type="button" aria-label="Open operator profile">
-          <span className="avatar avatar-maya">MB</span>
-          <span>
-            <strong>Maya Brooks</strong>
-            <small>Security administrator</small>
-          </span>
-          <b>•••</b>
-        </button>
       </aside>
 
       <section className="workspace">
@@ -938,14 +930,24 @@ export default function NySecureConsole() {
       </section>
 
       <nav className="section-taskbar" aria-label="Main sections">
-        {NAV_GROUPS.map((group) => {
-          const active = group.label === activeNavGroup.label;
-          return <button aria-current={active ? "page" : undefined} className={active ? "active" : ""} key={group.label} onClick={() => setActiveView(group.items[0].id)} type="button">
-            <span className="taskbar-symbol" aria-hidden="true">{group.symbol}</span>
-            <span><strong>{group.label}</strong><small>{group.description}</small></span>
-            <i aria-hidden="true">{active ? "●" : "○"}</i>
-          </button>;
-        })}
+        <div className="taskbar-sections">
+          {NAV_GROUPS.map((group) => {
+            const active = group.label === activeNavGroup.label;
+            return <button aria-current={active ? "page" : undefined} className={active ? "active" : ""} key={group.label} onClick={() => setActiveView(group.items[0].id)} type="button">
+              <span className="taskbar-symbol" aria-hidden="true">{group.symbol}</span>
+              <span><strong>{group.label}</strong><small>{group.description}</small></span>
+              <i aria-hidden="true">{active ? "●" : "○"}</i>
+            </button>;
+          })}
+        </div>
+        <button className="taskbar-profile" type="button" aria-label="Open Maya Brooks operator profile">
+          <span className="avatar avatar-maya">MB</span>
+          <span>
+            <strong>Maya Brooks</strong>
+            <small>Security administrator</small>
+          </span>
+          <b aria-hidden="true">•••</b>
+        </button>
       </nav>
 
       {showAddPerson && data && (
