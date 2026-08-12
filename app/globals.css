@@ -173,6 +173,9 @@ select:focus-visible {
   gap: 3px;
 }
 
+.nav-group { display: contents; }
+.nav-group + .nav-group .nav-section-label { margin-top: 12px; }
+
 .nav-section-label {
   margin: 0 10px 8px;
   color: #567479;
@@ -981,6 +984,8 @@ select:focus-visible {
 .profile-tabs button.active::after { background: #2d70df; }
 .profile-tab-content { padding: 28px 30px 34px; }
 .profile-tab-heading h3 { margin: 4px 0 20px; color: #2b464f; font-size: calc(17px * var(--font-scale)); }
+.profile-history-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: -8px 0 17px; }
+.profile-history-summary span { padding: 5px 8px; color: #315f7d; background: #eaf3fa; border: 1px solid #d8e7f1; border-radius: 999px; font-size: calc(7px * var(--font-scale)); font-weight: 740; }
 .cage-access-list { display: grid; gap: 11px; }
 .cage-access-list article { display: flex; gap: 13px; padding: 15px; background: #f8fafc; border: 1px solid #e0e7ec; border-radius: 9px; }
 .cage-access-icon { display: grid; width: 38px; height: 38px; place-items: center; flex: 0 0 auto; color: #266dd7; background: #e9f2ff; border-radius: 7px; font-size: calc(16px * var(--font-scale)); }
@@ -1156,6 +1161,29 @@ select:focus-visible {
 .alarm-pill.high { color: var(--red); background: var(--red-soft); }
 .alarm-pill.medium { color: var(--amber); background: var(--amber-soft); }
 .alarm-pill.low { color: var(--blue); background: var(--blue-soft); }
+.alarm-guidance { display: flex; align-items: center; gap: 10px; padding: 9px 14px; color: #5b7077; background: #f3f8fb; border-bottom: 1px solid #e2eaee; font-size: calc(7px * var(--font-scale)); }
+.alarm-guidance > span { display: grid; width: 22px; height: 22px; place-items: center; flex: 0 0 auto; color: #2768c8; background: #e3efff; border-radius: 6px; font-weight: 800; }
+.alarm-guidance p { margin: 0; line-height: 1.45; }
+.alarm-guidance strong { color: #35515d; }
+.alarm-row { cursor: default; }
+.alarm-row.person-linked { cursor: context-menu; }
+.alarm-person-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.alarm-person-heading > button { width: 27px; height: 25px; flex: 0 0 auto; color: #64777d; background: #f3f6f7; border: 1px solid #dce4e6; border-radius: 6px; cursor: pointer; font-size: calc(9px * var(--font-scale)); line-height: 1; }
+.alarm-person-heading > button:hover { color: #2768c8; background: #eaf2ff; border-color: #cbdcf6; }
+.alarm-context-layer { position: fixed; inset: 0; z-index: 80; }
+.alarm-context-menu { position: fixed; width: 220px; padding: 7px; background: #fff; border: 1px solid #d8e2e6; border-radius: 10px; box-shadow: 0 18px 46px rgba(21, 44, 55, .22); }
+.alarm-context-menu > p { margin: 2px 8px 6px; color: #8a979d; font-size: calc(6px * var(--font-scale)); font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+.alarm-context-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 8px; color: #344f58; background: transparent; border: 0; border-radius: 7px; cursor: pointer; text-align: left; }
+.alarm-context-menu button:hover { background: #eef4fb; }
+.alarm-context-menu button > span:first-child { display: grid; width: 27px; height: 27px; place-items: center; flex: 0 0 auto; color: #2768c8; background: #e6f0ff; border-radius: 7px; font-weight: 800; }
+.alarm-context-menu button strong, .alarm-context-menu button small { display: block; }
+.alarm-context-menu button strong { font-size: calc(8px * var(--font-scale)); }
+.alarm-context-menu button small { margin-top: 2px; color: #86949a; font-size: calc(6px * var(--font-scale)); }
+.alarm-profile-backdrop { z-index: 70; display: grid; place-items: center; padding: 24px; }
+.alarm-profile-dialog { width: min(1060px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border: 1px solid #d8e2e6; border-radius: 14px; box-shadow: 0 28px 80px rgba(4, 22, 26, .28); }
+.alarm-profile-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 18px; border-bottom: 1px solid #e1e8ec; }
+.alarm-profile-dialog > header h2 { margin: 3px 0 0; color: #29464f; font-size: calc(17px * var(--font-scale)); }
+.alarm-profile-dialog .person-profile-card { min-height: min(650px, calc(100vh - 150px)); border: 0; border-radius: 0; }
 
 .modal-backdrop,
 .drawer-backdrop {
@@ -1654,6 +1682,11 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .segmented-setting button.active { background: #1b2f4b; }
 .app-shell[data-theme="dark"] .widget-options label,
 .app-shell[data-theme="dark"] .font-size-options button { background: #0c1728; }
+.app-shell[data-theme="dark"] :is(.alarm-guidance, .profile-history-summary span) { color: #a9c8ff; background: #142b48; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.alarm-guidance strong, .alarm-context-menu button, .alarm-profile-dialog > header h2) { color: var(--ink); }
+.app-shell[data-theme="dark"] :is(.alarm-context-menu, .alarm-profile-dialog) { background: var(--surface); border-color: var(--line); }
+.app-shell[data-theme="dark"] .alarm-context-menu button:hover { background: #1a2d48; }
+.app-shell[data-theme="dark"] .alarm-person-heading > button { color: #a9b9cc; background: #132238; border-color: var(--line); }
 
 @media (max-width: 1450px) {
   .facility-layout { grid-template-columns: minmax(210px, 250px) minmax(0, 1fr); }
@@ -1763,4 +1796,8 @@ select:focus-visible {
   .profile-tabs button { height: 43px; padding-inline: 9px; font-size: calc(8px * var(--font-scale)); }
   .profile-tab-content { padding: 22px 18px 28px; }
   .profile-contact dl { grid-template-columns: 1fr; }
+  .alarm-guidance { align-items: flex-start; }
+  .alarm-profile-backdrop { padding: 10px; }
+  .alarm-profile-dialog { max-height: calc(100vh - 20px); }
+  .alarm-profile-dialog .person-profile-card { min-height: 0; }
 }

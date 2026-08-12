@@ -21,6 +21,11 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(initSource, /DOOR_HELD/);
   assert.match(initSource, /MONITORING_POINT_ALARM/);
   assert.match(consoleSource, /Filter by alarm type/);
+  assert.match(consoleSource, /Customer data/);
+  assert.match(consoleSource, /Alarm center/);
+  assert.match(consoleSource, /Right-click an alarm/);
+  assert.match(consoleSource, /Open contact card/);
+  assert.match(consoleSource, /View 24-hour scans/);
   assert.match(consoleSource, /Scheduled visits/);
   assert.match(consoleSource, /01-XXXXXX/);
   assert.match(consoleSource, /Customer cage/);
@@ -46,7 +51,8 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /closeProfile/);
   assert.doesNotMatch(consoleSource, /profile-card-backdrop/);
   assert.match(consoleSource, /IBX access PIN/);
-  assert.match(consoleSource, /Access history/);
+  assert.match(consoleSource, /24-hour scans/);
+  assert.match(consoleSource, /Scan locations/);
   assert.match(consoleSource, /Point of contact/);
   assert.match(consoleSource, /blank-contact-photo/);
   assert.match(consoleSource, /name="phoneNumber"/);
