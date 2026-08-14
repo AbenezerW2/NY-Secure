@@ -81,6 +81,97 @@ function nextTicketNumber() {
   return `${TICKET_PREFIX}-${String(value).padStart(6, "0")}`;
 }
 
+type VisitAdmissionRecord = {
+  ticketNumber: string;
+  status: string;
+  organizationId: string;
+  visitorName: string;
+  visitorEmail: string | null;
+  visitorPhone: string | null;
+  validFrom: string;
+  validUntil: string;
+  signedInAt: string | null;
+  signedOutAt: string | null;
+  allowedHours: string;
+};
+
+function visitorNameParts(visitorName: string) {
+  const parts = visitorName.trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "Scheduled",
+    lastName: parts.slice(1).join(" ") || "Visitor",
+  };
+}
+
+async function visitorPresenceCommands(db: D1Database, visit: VisitAdmissionRecord, signedInAt: string) {
+  const existingPerson = await db
+    .prepare(
+      `SELECT id FROM people
+       WHERE (? IS NOT NULL AND lower(email) = lower(?))
+          OR (organization_id = ? AND lower(trim(first_name || ' ' || last_name)) = lower(trim(?)))
+       ORDER BY CASE WHEN ? IS NOT NULL AND lower(email) = lower(?) THEN 0 ELSE 1 END
+       LIMIT 1`,
+    )
+    .bind(visit.visitorEmail, visit.visitorEmail, visit.organizationId, visit.visitorName, visit.visitorEmail, visit.visitorEmail)
+    .first<{ id: string }>();
+  const ticketKey = visit.ticketNumber.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  const personId = existingPerson?.id ?? `person-visit-${ticketKey}`;
+  const openCheckIn = existingPerson
+    ? await db
+      .prepare("SELECT id FROM site_check_ins WHERE person_id = ? AND status IN ('PENDING', 'ON_SITE')")
+      .bind(personId)
+      .first<{ id: string }>()
+    : null;
+  const commands: D1PreparedStatement[] = [];
+
+  if (!existingPerson) {
+    const { firstName, lastName } = visitorNameParts(visit.visitorName);
+    commands.push(db
+      .prepare(
+        `INSERT INTO people
+          (id, first_name, last_name, email, phone_number, ibx_access_pin,
+           organization_id, relationship_type, job_function, badge_number, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'VISITOR', 'Scheduled visitor', ?, 1)`,
+      )
+      .bind(
+        personId,
+        firstName,
+        lastName,
+        visit.visitorEmail || `${ticketKey}@scheduled-visit.ny-secure.local`,
+        visit.visitorPhone || "",
+        visit.ticketNumber.replace(/\D/g, "").slice(-6).padStart(6, "0"),
+        visit.organizationId,
+        `WV-${visit.ticketNumber}`,
+      ));
+  }
+
+  if (openCheckIn) {
+    commands.push(db
+      .prepare(
+        `UPDATE site_check_ins
+         SET status = 'ON_SITE', verified_at = COALESCE(verified_at, ?),
+           verified_by = COALESCE(verified_by, 'Maya Brooks'), updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status IN ('PENDING', 'ON_SITE')`,
+      )
+      .bind(signedInAt, openCheckIn.id));
+  } else {
+    commands.push(db
+      .prepare(
+        `INSERT INTO site_check_ins
+          (id, person_id, source, status, requested_at, verified_at, verified_by, notes)
+         VALUES (?, ?, 'KIOSK', 'ON_SITE', ?, ?, 'Maya Brooks', ?)`,
+      )
+      .bind(
+        `checkin-visit-${ticketKey}`,
+        personId,
+        signedInAt,
+        signedInAt,
+        `Work visit ${visit.ticketNumber} · Security-verified ticket admission.`,
+      ));
+  }
+  return commands;
+}
+
 export async function POST(request: Request) {
   try {
     const payload = await readJsonObject(request);
@@ -197,13 +288,16 @@ export async function PATCH(request: Request) {
     const db = await ensureDatabase();
     const visit = await db
       .prepare(
-        `SELECT ticket_number AS ticketNumber, status, valid_from AS validFrom,
+        `SELECT ticket_number AS ticketNumber, status,
+          organization_id AS organizationId, visitor_name AS visitorName,
+          visitor_email AS visitorEmail, visitor_phone AS visitorPhone,
+          valid_from AS validFrom,
           valid_until AS validUntil, signed_in_at AS signedInAt,
           signed_out_at AS signedOutAt, allowed_hours AS allowedHours
          FROM scheduled_visits WHERE ticket_number = ?`,
       )
       .bind(ticketNumber)
-      .first<{ ticketNumber: string; status: string; validFrom: string; validUntil: string; signedInAt: string | null; signedOutAt: string | null; allowedHours: string }>();
+      .first<VisitAdmissionRecord>();
 
     if (!visit) {
       throw new ApiError(404, "VISIT_NOT_FOUND", "The work visit ticket was not found.");
@@ -215,6 +309,7 @@ export async function PATCH(request: Request) {
       throw new ApiError(409, "VISIT_COMPLETED", "This work visit has already been completed.");
     }
     if (visit.signedInAt) {
+      await db.batch(await visitorPresenceCommands(db, visit, visit.signedInAt));
       return Response.json({ ticketNumber, status: "ACTIVE", signedInAt: visit.signedInAt, alreadyStarted: true });
     }
 
@@ -237,14 +332,15 @@ export async function PATCH(request: Request) {
     }
 
     const signedInAt = now.toISOString();
-    const result = await db
-      .prepare(
+    const [result] = await db.batch([
+      db.prepare(
       `UPDATE scheduled_visits
          SET signed_in_at = ?, updated_at = CURRENT_TIMESTAMP
          WHERE ticket_number = ? AND signed_in_at IS NULL AND signed_out_at IS NULL`,
       )
-      .bind(signedInAt, ticketNumber)
-      .run() as { meta: { changes?: number } };
+      .bind(signedInAt, ticketNumber),
+      ...await visitorPresenceCommands(db, visit, signedInAt),
+    ]) as Array<{ meta: { changes?: number } }>;
     if (Number(result.meta.changes ?? 0) === 0) {
       throw new ApiError(409, "VISIT_STATE_CHANGED", "The work visit changed before it could be started. Refresh and try again.");
     }

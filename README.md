@@ -70,7 +70,7 @@ The visit board shows upcoming, active, delivery, and status information. Each c
 
 Selecting a ticket number or double-clicking its row opens that work visit in an internal tab. The ticket view shows the requester/point of contact, work-visit number, customer cage, cabinet scope, approved start/end date and time, delivery details, and the visitor’s contact record. A separate **NOC / POC comments** tab shows any requester instructions plus every authorized hour in an explicit format such as `2026-08-16: 08, 09, 10, 11`.
 
-Security must confirm the visitor photo before selecting **Verify photo & start ticket**. The server checks both the overall validity window and the current DC-01 date/hour against the mandatory schedule. An attempt outside the approved hours is blocked with a **Please check the time** popup; a successful start is persisted in D1 and changes the visit to active.
+Security must confirm the visitor photo before selecting **Verify photo & start ticket**. The server checks both the overall validity window and the current DC-01 date/hour against the mandatory schedule. An attempt outside the approved hours is blocked with a **Please check the time** popup; a successful start is persisted in D1 and atomically creates or verifies the visitor’s On-site presence record. Every successfully signed-in person therefore appears in the On-site section without exception.
 
 Expired tickets disappear immediately when the visitor is not signed in. If the visitor remains signed in after the valid window ends, the ticket stays visible as **Signed in · overdue** and the row receives a red warning outline. Security verification and sign-out update the matching scheduled ticket when the person and ticket identity can be correlated.
 

@@ -102,6 +102,12 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(visitsRoute, /America\/New_York/);
   assert.match(visitsRoute, /SET signed_in_at = \?, updated_at = CURRENT_TIMESTAMP/);
   assert.doesNotMatch(visitsRoute, /SET signed_in_at = \?, status = 'ACTIVE'/);
+  assert.match(visitsRoute, /visitorPresenceCommands/);
+  assert.match(visitsRoute, /relationship_type, job_function, badge_number/);
+  assert.match(visitsRoute, /'KIOSK', 'ON_SITE'/);
+  assert.match(visitsRoute, /await db\.batch/);
+  assert.match(initSource, /Reconciled ticket admission/);
+  assert.match(initSource, /v\.signed_in_at IS NOT NULL AND v\.signed_out_at IS NULL/);
   assert.match(consoleSource, /Signed in · overdue/);
   assert.match(consoleSource, /effectiveVisitStatus/);
   assert.match(consoleSource, /setInterval\(\(\) => setVisitClock\(Date\.now\(\)\), 1000\)/);

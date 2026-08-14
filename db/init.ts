@@ -1169,6 +1169,60 @@ async function seedDatabase(db: D1Database) {
     }),
   );
 
+  await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO people
+        (id, first_name, last_name, email, phone_number, ibx_access_pin,
+         organization_id, relationship_type, job_function, badge_number, active)
+       SELECT 'person-visit-' || lower(replace(v.ticket_number, '-', '')),
+         CASE WHEN instr(trim(v.visitor_name), ' ') > 0
+           THEN substr(trim(v.visitor_name), 1, instr(trim(v.visitor_name), ' ') - 1)
+           ELSE trim(v.visitor_name) END,
+         CASE WHEN instr(trim(v.visitor_name), ' ') > 0
+           THEN substr(trim(v.visitor_name), instr(trim(v.visitor_name), ' ') + 1)
+           ELSE 'Visitor' END,
+         COALESCE(NULLIF(lower(v.visitor_email), ''), lower(replace(v.ticket_number, '-', '')) || '@scheduled-visit.ny-secure.local'),
+         COALESCE(v.visitor_phone, ''), substr('000000' || replace(v.ticket_number, '-', ''), -6, 6),
+         v.organization_id, 'VISITOR', 'Scheduled visitor', 'WV-' || v.ticket_number, 1
+       FROM scheduled_visits v
+       WHERE v.signed_in_at IS NOT NULL AND v.signed_out_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM people p
+           WHERE (v.visitor_email IS NOT NULL AND lower(p.email) = lower(v.visitor_email))
+              OR (p.organization_id = v.organization_id
+                AND lower(trim(p.first_name || ' ' || p.last_name)) = lower(trim(v.visitor_name)))
+         )`,
+    ),
+    db.prepare(
+      `UPDATE site_check_ins
+       SET status = 'ON_SITE', verified_at = COALESCE(verified_at, requested_at),
+         verified_by = COALESCE(verified_by, 'Maya Brooks'), updated_at = CURRENT_TIMESTAMP
+       WHERE status = 'PENDING' AND person_id IN (
+         SELECT p.id FROM scheduled_visits v JOIN people p
+           ON (v.visitor_email IS NOT NULL AND lower(p.email) = lower(v.visitor_email))
+           OR (p.organization_id = v.organization_id
+             AND lower(trim(p.first_name || ' ' || p.last_name)) = lower(trim(v.visitor_name)))
+         WHERE v.signed_in_at IS NOT NULL AND v.signed_out_at IS NULL
+       )`,
+    ),
+    db.prepare(
+      `INSERT OR IGNORE INTO site_check_ins
+        (id, person_id, source, status, requested_at, verified_at, verified_by, notes)
+       SELECT 'checkin-visit-' || lower(replace(v.ticket_number, '-', '')), p.id,
+         'KIOSK', 'ON_SITE', v.signed_in_at, v.signed_in_at, 'Maya Brooks',
+         'Work visit ' || v.ticket_number || ' · Reconciled ticket admission.'
+       FROM scheduled_visits v JOIN people p
+         ON (v.visitor_email IS NOT NULL AND lower(p.email) = lower(v.visitor_email))
+         OR (p.organization_id = v.organization_id
+           AND lower(trim(p.first_name || ' ' || p.last_name)) = lower(trim(v.visitor_name)))
+       WHERE v.signed_in_at IS NOT NULL AND v.signed_out_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM site_check_ins c
+           WHERE c.person_id = p.id AND c.status IN ('PENDING', 'ON_SITE')
+         )`,
+    ),
+  ]);
+
   const previousRequestedAt = new Date(now.getTime() - 31 * 60 * 60 * 1000);
   const previousVerifiedAt = new Date(previousRequestedAt.getTime() + 5 * 60 * 1000);
   const previousSignedOutAt = new Date(previousVerifiedAt.getTime() + 4.5 * 60 * 60 * 1000);
