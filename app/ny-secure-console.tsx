@@ -1725,35 +1725,29 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
 }
 
 function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people: Person[]; orgMap: Map<string, Organization> }) {
-  const [query, setQuery] = useState("");
-  const [searchRequest, setSearchRequest] = useState<{ query: string; requestedAt: number } | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [searchRequest, setSearchRequest] = useState<{ firstName: string; lastName: string; cardNumber: string; requestedAt: number } | null>(null);
   const peopleMap = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
+  const hasDraftCriteria = [firstName, lastName, cardNumber].some((value) => value.trim().length > 0);
+  const hasSearchCriteria = Boolean(searchRequest && [searchRequest.firstName, searchRequest.lastName, searchRequest.cardNumber].some(Boolean));
   const results = useMemo(() => {
     if (!searchRequest) return [];
-    const needle = searchRequest.query;
     const cutoff = searchRequest.requestedAt - 48 * 60 * 60 * 1000;
     const latestByPerson = new Map<string, AccessEvent>();
 
     for (const event of events) {
       const occurredAt = new Date(event.occurredAt).getTime();
       if (!Number.isFinite(occurredAt) || occurredAt > searchRequest.requestedAt) continue;
-      if (!needle && occurredAt < cutoff) continue;
+      if (!hasSearchCriteria && occurredAt < cutoff) continue;
 
       const person = peopleMap.get(event.personId);
-      const organization = person ? orgMap.get(person.organizationId) : undefined;
-      const searchable = [
-        event.personName,
-        event.organizationName,
-        person?.firstName,
-        person?.lastName,
-        person ? `${person.firstName} ${person.lastName}` : "",
-        person?.email,
-        person?.badgeId,
-        person?.organizationName,
-        organization?.name,
-        organization?.oid,
-      ];
-      if (needle && !wildcardMatchAny(searchable, needle)) continue;
+      if (hasSearchCriteria && !(
+        wildcardMatch(person?.firstName ?? "", searchRequest.firstName) &&
+        wildcardMatch(person?.lastName ?? "", searchRequest.lastName) &&
+        wildcardMatch(person?.badgeId ?? "", searchRequest.cardNumber)
+      )) continue;
 
       const key = event.personId || event.personName || String(event.id);
       const current = latestByPerson.get(key);
@@ -1766,43 +1760,54 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
         return { event, person, organization: person ? orgMap.get(person.organizationId) : undefined };
       })
       .sort((a, b) => new Date(b.event.occurredAt).getTime() - new Date(a.event.occurredAt).getTime());
-  }, [events, orgMap, peopleMap, searchRequest]);
+  }, [events, hasSearchCriteria, orgMap, peopleMap, searchRequest]);
   const grantedCount = results.filter(({ event }) => event.decision === "GRANTED").length;
   const locationCount = new Set(results.map(({ event }) => event.zoneName || event.zoneId)).size;
+  const searchDescription = searchRequest ? [
+    searchRequest.firstName && `First name “${searchRequest.firstName}”`,
+    searchRequest.lastName && `Last name “${searchRequest.lastName}”`,
+    searchRequest.cardNumber && `Card “${searchRequest.cardNumber}”`,
+  ].filter(Boolean).join(" · ") : "";
 
   function locate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSearchRequest({ query: query.trim(), requestedAt: Date.now() });
+    setSearchRequest({ firstName: firstName.trim(), lastName: lastName.trim(), cardNumber: cardNumber.trim(), requestedAt: Date.now() });
   }
 
   return (
     <div className="locator-layout">
-      <section className="panel locator-search-panel">
-        <div className="locator-search-copy"><span className="locator-mark" aria-hidden="true">⌖</span><div><p className="eyebrow">Activity-log lookup</p><h2>Find a last-known scan</h2><p>Enter a person, badge, company, or OID to search the complete log. Leave the field empty to locate everyone who scanned during the past 48 hours.</p></div></div>
-        <form className="locator-form" onSubmit={locate}>
-          <label><span>Person or customer record</span><div><i aria-hidden="true">⌕</i><input aria-label="Search locator by person, badge, company, or OID" onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Ama*, *Securities*, or OID-*" title="Use * to match any characters" value={query} /></div></label>
-          <button className="primary-button" type="submit"><span aria-hidden="true">⌖</span>{query.trim() ? "Locate person" : "Locate everyone"}</button>
+      <section className="panel directory-panel people-directory locator-directory">
+        <div className="people-search-header">
+          <div><p className="eyebrow">Activity-log lookup</p><h2>Find a last-known scan</h2><p>Search by first name, last name, and/or card number. Populated fields must all match. Use * as a wildcard.</p></div>
+        </div>
+        <form className="people-search-box locator-search-box" onSubmit={locate}>
+          <div className="people-search-grid locator-search-grid">
+            <label className="people-query"><span>First name</span><input aria-label="Locate by first name" autoFocus onChange={(event) => setFirstName(event.target.value)} placeholder="e.g. Ama*" title="Use * to match any characters" value={firstName} /></label>
+            <label className="people-query"><span>Last name</span><input aria-label="Locate by last name" onChange={(event) => setLastName(event.target.value)} placeholder="e.g. *kafor" title="Use * to match any characters" value={lastName} /></label>
+            <label className="people-query"><span>Card number</span><input aria-label="Locate by card number" onChange={(event) => setCardNumber(event.target.value)} placeholder="e.g. CUS-*" title="Use * to match any characters" value={cardNumber} /></label>
+            <button className="primary-button people-search-button locator-search-button" type="submit"><span aria-hidden="true">⌖</span>{hasDraftCriteria ? "Locate person" : "Locate everyone"}</button>
+          </div>
         </form>
         <div className="locator-mode-note"><span>48h</span><p><strong>Empty-search mode</strong> scans the activity log and returns each person’s single most recent location within the last 48 hours.</p></div>
       </section>
 
-      {!searchRequest && <section className="panel locator-waiting"><span aria-hidden="true">⌖</span><h2>Ready to locate</h2><p>Search for one person or submit the empty field for the 48-hour roster.</p></section>}
+      {!searchRequest && <section className="panel locator-waiting"><span aria-hidden="true">⌖</span><h2>Ready to locate</h2><p>Enter one or more identity fields, or submit all three empty fields for the 48-hour roster.</p></section>}
 
       {searchRequest && <section className="locator-results">
         <div className="locator-summary-grid">
-          <article className="panel"><span>People located</span><strong>{results.length}</strong><small>{searchRequest.query ? "Matching the entered search" : "With a scan in the last 48 hours"}</small></article>
+          <article className="panel"><span>People located</span><strong>{results.length}</strong><small>{hasSearchCriteria ? "Matching all entered fields" : "With a scan in the last 48 hours"}</small></article>
           <article className="panel"><span>Last scan granted</span><strong>{grantedCount}</strong><small>Latest successful access decisions</small></article>
           <article className="panel"><span>Locations represented</span><strong>{locationCount}</strong><small>Unique last-known access points</small></article>
         </div>
         <section className="panel directory-panel locator-results-panel">
-          <header><div><p className="eyebrow">{searchRequest.query ? "Complete log search" : "Past 48 hours"}</p><h2>{searchRequest.query ? `Latest scan matching “${searchRequest.query}”` : "Everyone’s latest scan"}</h2><p>One most-recent activity-log result per person.</p></div><span className="result-count">{results.length} {results.length === 1 ? "person" : "people"}</span></header>
+          <header><div><p className="eyebrow">{hasSearchCriteria ? "Complete log search" : "Past 48 hours"}</p><h2>{hasSearchCriteria ? "Latest matching scans" : "Everyone’s latest scan"}</h2><p>{hasSearchCriteria ? searchDescription : "One most-recent activity-log result per person."}</p></div><span className="result-count">{results.length} {results.length === 1 ? "person" : "people"}</span></header>
           <div className="table-wrap"><table className="data-table locator-table"><thead><tr><th>Who</th><th>Customer</th><th>Last location</th><th>Decision</th><th>Last scan</th></tr></thead><tbody>{results.map(({ event, person, organization }) => <tr key={event.personId || event.id}>
             <td><strong>{person ? `${person.firstName} ${person.lastName}` : event.personName || "Unknown credential"}</strong><small>{person?.badgeId || "No linked badge"}</small></td>
             <td><strong>{organization?.name || person?.organizationName || event.organizationName || "Unassigned"}</strong><small>{organization?.oid || "No OID"}</small></td>
             <td><strong>{event.zoneName || event.zoneId}</strong><small>Entry reader</small></td>
             <td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{label(event.reasonCode)}</small></td>
             <td><strong>{formatDate(event.occurredAt)} · {formatTime(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td>
-          </tr>)}</tbody></table>{results.length === 0 && <div className="activity-empty"><strong>No matching scans found</strong><span>{searchRequest.query ? "Try a different name, badge, company, or OID." : "No one has a recorded scan in the past 48 hours."}</span></div>}</div>
+          </tr>)}</tbody></table>{results.length === 0 && <div className="activity-empty"><strong>No matching scans found</strong><span>{hasSearchCriteria ? "Try different first-name, last-name, or card-number values." : "No one has a recorded scan in the past 48 hours."}</span></div>}</div>
         </section>
       </section>}
     </div>

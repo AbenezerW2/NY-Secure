@@ -27,7 +27,7 @@ The console uses a two-level navigation model. The bottom taskbar switches betwe
 
 ### Alarm center
 
-- **Locator** — finds a person’s latest matching scan across the complete activity log. Submitting an empty search returns each person’s single latest scan from the past 48 hours.
+- **Locator** — searches the complete activity log with separate first-name, last-name, and card-number fields. Submitting all fields empty returns each person’s single latest scan from the past 48 hours.
 - **Alarms** — provides a dedicated alarm report with severity and type filters, CSV export, and person-linked actions.
 - **Activity log** — provides the searchable grant/denial audit trail with decision and location filters plus CSV export.
 
@@ -102,8 +102,8 @@ Every simulated access decision records the person, zone, matched assignment/pro
 
 Locator has two operating modes:
 
-- Enter a name, badge, company, OID, or other supported pattern to find the most recent matching access event in the complete log.
-- Leave the search blank and select **Locate everyone** to return one last-known scan per person from the past 48 hours.
+- Enter a first name, last name, card number, or any combination of those fields to find the most recent matching access event in the complete log. Every populated field must match, and each field supports `*` wildcards.
+- Leave all three fields blank and select **Locate everyone** to return one last-known scan per person from the past 48 hours.
 
 Results include the person, customer, last location, decision, and scan timestamp.
 

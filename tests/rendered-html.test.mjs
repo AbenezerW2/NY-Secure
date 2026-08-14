@@ -34,6 +34,10 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(styles, /\.sidebar-navigation[\s\S]*overflow-y:\s*auto/);
   assert.match(consoleSource, /Last-known access point/);
   assert.match(consoleSource, /Find a last-known scan/);
+  assert.match(consoleSource, /aria-label="Locate by first name"/);
+  assert.match(consoleSource, /aria-label="Locate by last name"/);
+  assert.match(consoleSource, /aria-label="Locate by card number"/);
+  assert.match(consoleSource, /Populated fields must all match/);
   assert.match(consoleSource, /Locate everyone/);
   assert.match(consoleSource, /48 \* 60 \* 60 \* 1000/);
   assert.match(consoleSource, /Everyone’s latest scan/);
