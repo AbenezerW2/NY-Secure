@@ -910,7 +910,7 @@ export default function NySecureConsole() {
                   setSelectedZoneId={setSelectedZoneId}
                 />
               )}
-              {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} />}
+              {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} onVisitsChanged={loadState} />}
               {activeView === "locator" && <LocatorView events={data.events} people={data.people} orgMap={orgMap} />}
               {activeView === "alarms" && (
                 <AlarmsView
@@ -1668,10 +1668,15 @@ function FacilityView({ zones, selectedZone, selectedZoneId, setSelectedZoneId }
   );
 }
 
-function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
+function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVisit[]; onVisitsChanged: () => Promise<void> }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [columnFilters, setColumnFilters] = useState({ ticket: "", visitor: "", customer: "", access: "", window: "", delivery: "", status: "" });
+  const [openTicketNumbers, setOpenTicketNumbers] = useState<string[]>([]);
+  const [activeTicketNumber, setActiveTicketNumber] = useState<string | null>(null);
+  const [photoVerified, setPhotoVerified] = useState<Record<string, boolean>>({});
+  const [startingTicket, setStartingTicket] = useState<string | null>(null);
+  const [ticketError, setTicketError] = useState("");
   const [visitClock, setVisitClock] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setVisitClock(Date.now()), 1000);
@@ -1700,10 +1705,48 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
   const activeCount = visibleVisits.filter(isSignedIn).length;
   const deliveryCount = visibleVisits.filter((visit) => visit.hasDelivery && visit.status !== "CANCELLED").length;
   const setColumnFilter = (column: keyof typeof columnFilters, value: string) => setColumnFilters((current) => ({ ...current, [column]: value }));
+  const activeTicket = activeTicketNumber ? visits.find((visit) => visit.ticketNumber === activeTicketNumber) : undefined;
+
+  function openTicket(ticketNumber: string) {
+    setOpenTicketNumbers((current) => current.includes(ticketNumber) ? current : [...current, ticketNumber]);
+    setActiveTicketNumber(ticketNumber);
+    setTicketError("");
+  }
+
+  function closeTicket(ticketNumber: string) {
+    setOpenTicketNumbers((current) => current.filter((item) => item !== ticketNumber));
+    if (activeTicketNumber === ticketNumber) setActiveTicketNumber(null);
+    setTicketError("");
+  }
+
+  async function startTicket(visit: ScheduledVisit) {
+    setStartingTicket(visit.ticketNumber);
+    setTicketError("");
+    try {
+      const response = await fetch("/api/visits", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ticketNumber: visit.ticketNumber, action: "START", photoVerified: photoVerified[visit.ticketNumber] === true }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The work visit could not be started.");
+      await onVisitsChanged();
+      setPhotoVerified((current) => ({ ...current, [visit.ticketNumber]: false }));
+    } catch (error) {
+      setTicketError(error instanceof Error ? error.message : "The work visit could not be started.");
+    } finally {
+      setStartingTicket(null);
+    }
+  }
 
   return (
     <div className="visits-workspace">
-      <div className="visit-summary-grid">
+      <nav className="people-workspace-tabs visit-workspace-tabs" aria-label="Open scheduled visit tabs">
+        <button className={activeTicketNumber === null ? "active" : ""} onClick={() => { setActiveTicketNumber(null); setTicketError(""); }} type="button"><span aria-hidden="true">▦</span> Scheduled visits <b>{visibleVisits.length}</b></button>
+        {openTicketNumbers.map((ticketNumber) => <div className={activeTicketNumber === ticketNumber ? "people-tab-shell active" : "people-tab-shell"} key={ticketNumber}><button className="person-tab visit-ticket-tab" onClick={() => { setActiveTicketNumber(ticketNumber); setTicketError(""); }} type="button"><span aria-hidden="true">▣</span> {ticketNumber}</button><button aria-label={`Close work visit ${ticketNumber}`} className="close-people-tab" onClick={() => closeTicket(ticketNumber)} type="button">×</button></div>)}
+      </nav>
+
+      {activeTicketNumber === null && <><div className="visit-summary-grid">
         <article className="panel visit-summary-card"><span>Upcoming</span><strong>{scheduledCount}</strong><small>Scheduled visit tickets</small></article>
         <article className="panel visit-summary-card active"><span>On site now</span><strong>{activeCount}</strong><small>Security-signed-in visitors</small></article>
         <article className="panel visit-summary-card delivery"><span>Deliveries</span><strong>{deliveryCount}</strong><small>Upcoming package arrivals</small></article>
@@ -1729,8 +1772,8 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
             </tr></thead>
             <tbody>{filteredVisits.map((visit) => {
               const effectiveStatus = effectiveVisitStatus(visit);
-              return <tr className={effectiveStatus === "OVERDUE" ? "overdue-visit" : undefined} key={visit.ticketNumber}>
-                <td><strong className="ticket-number">{visit.ticketNumber}</strong><small>{visit.siteCode}</small>{visit.comments && <small title={visit.comments}>Comment added</small>}</td>
+              return <tr className={effectiveStatus === "OVERDUE" ? "overdue-visit" : undefined} key={visit.ticketNumber} onDoubleClick={() => openTicket(visit.ticketNumber)} title="Double-click to open this work visit">
+                <td><button aria-label={`Open work visit ${visit.ticketNumber}`} className="ticket-number ticket-number-link" onClick={() => openTicket(visit.ticketNumber)} type="button">{visit.ticketNumber}</button><small>{visit.siteCode}</small>{visit.comments && <small title={visit.comments}>Comment added</small>}</td>
                 <td><strong>{visit.visitorName}</strong><small>{visit.visitorEmail || visit.visitorPhone || "Contact not provided"}</small></td>
                 <td><strong>{visit.organizationName}</strong><small>{visit.requesterName}</small></td>
                 <td><strong>{visit.cageName}</strong><div className="cabinet-tags">{visit.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</div></td>
@@ -1743,6 +1786,46 @@ function ScheduledVisitsView({ visits }: { visits: ScheduledVisit[] }) {
           {filteredVisits.length === 0 && <div className="activity-empty"><strong>No matching visit tickets</strong><span>Try another search or status filter.</span></div>}
         </div>
       </section>
+      </>}
+
+      {activeTicketNumber !== null && activeTicket && (() => {
+        const effectiveStatus = effectiveVisitStatus(activeTicket);
+        const signedIn = isSignedIn(activeTicket);
+        const startsAt = new Date(activeTicket.validFrom).getTime();
+        const endsAt = new Date(activeTicket.validUntil).getTime();
+        const startsLater = visitClock < startsAt;
+        const expired = visitClock > endsAt;
+        const canStart = !signedIn && activeTicket.status !== "CANCELLED" && !startsLater && !expired;
+        return <section className={`panel visit-ticket-detail ${effectiveStatus === "OVERDUE" ? "overdue" : ""}`}>
+          <header className="visit-ticket-detail-header"><div><p className="eyebrow">DC-01 work visit</p><h2>{activeTicket.ticketNumber}</h2><p>Security ticket record and visitor admission workflow.</p></div><span className={`visit-status ${effectiveStatus.toLowerCase()}`}><i />{effectiveStatus === "OVERDUE" ? "Signed in · overdue" : label(effectiveStatus)}</span></header>
+          {ticketError && <div className="visit-ticket-error" role="alert">{ticketError}</div>}
+          <div className="visit-ticket-detail-layout">
+            <section className="visit-ticket-information">
+              <div className="visit-ticket-section-heading"><p className="eyebrow">Work authorization</p><h3>Ticket information</h3><p>The approved access scope and schedule for this visit.</p></div>
+              <dl className="visit-ticket-facts">
+                <div className="wide"><dt>Point of contact</dt><dd><strong>{activeTicket.requesterName}</strong><small>{activeTicket.organizationName}</small></dd></div>
+                <div><dt>Work visit number</dt><dd><code>{activeTicket.ticketNumber}</code></dd></div>
+                <div><dt>Site</dt><dd>{activeTicket.siteCode}</dd></div>
+                <div><dt>Cage</dt><dd>{activeTicket.cageName}</dd></div>
+                <div><dt>Cabinets</dt><dd><span className="cabinet-tags">{activeTicket.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</span></dd></div>
+                <div><dt>Ticket starts</dt><dd><strong>{formatDate(activeTicket.validFrom)}</strong><small>{formatTime(activeTicket.validFrom)} · 24-hour time</small></dd></div>
+                <div><dt>Ticket ends</dt><dd><strong>{formatDate(activeTicket.validUntil)}</strong><small>{formatTime(activeTicket.validUntil)} · {formatOnSiteDuration(activeTicket.validFrom, activeTicket.validUntil)} window</small></dd></div>
+                <div className="wide"><dt>Work instructions / comments</dt><dd>{activeTicket.comments || "No additional instructions were added."}</dd></div>
+                <div className="wide"><dt>Delivery</dt><dd>{activeTicket.hasDelivery ? <><strong>{activeTicket.packageCount} package{activeTicket.packageCount === 1 ? "" : "s"}</strong><small>{activeTicket.packageDetails || "Package delivery attached to this visit."}</small></> : "No delivery is attached to this visit."}</dd></div>
+              </dl>
+            </section>
+            <aside className="visit-ticket-identity">
+              <div className="visit-photo-frame"><span className="blank-contact-photo" aria-label="Visitor photo placeholder"><i /><b /></span><em>Visitor photo</em></div>
+              <p className="eyebrow">Person on ticket</p><h3>{activeTicket.visitorName}</h3><span className="profile-record-type">Scheduled visitor</span>
+              <dl><div><dt>Email</dt><dd>{activeTicket.visitorEmail ? <a href={`mailto:${activeTicket.visitorEmail}`}>{activeTicket.visitorEmail}</a> : "Not provided"}</dd></div><div><dt>Phone</dt><dd>{activeTicket.visitorPhone ? <a href={`tel:${activeTicket.visitorPhone}`}>{activeTicket.visitorPhone}</a> : "Not provided"}</dd></div>{signedIn && <div><dt>Security started ticket</dt><dd>{formatDate(activeTicket.signedInAt)} · {formatTime(activeTicket.signedInAt!)}</dd></div>}</dl>
+              {!signedIn && activeTicket.status !== "CANCELLED" && !expired && <label className="visit-photo-verification"><input checked={photoVerified[activeTicket.ticketNumber] === true} onChange={(event) => setPhotoVerified((current) => ({ ...current, [activeTicket.ticketNumber]: event.target.checked }))} type="checkbox" /><span><strong>Photo verified</strong><small>I compared the visitor and their ID with the ticket record.</small></span></label>}
+              <button className="primary-button start-visit-button" disabled={!canStart || photoVerified[activeTicket.ticketNumber] !== true || startingTicket === activeTicket.ticketNumber} onClick={() => startTicket(activeTicket)} type="button"><span aria-hidden="true">✓</span>{signedIn ? "Ticket active" : startsLater ? `Starts at ${formatTime(activeTicket.validFrom)}` : expired ? "Ticket expired" : startingTicket === activeTicket.ticketNumber ? "Starting ticket…" : "Verify photo & start ticket"}</button>
+              {signedIn && <p className="visit-ticket-active-note"><span>●</span> Visitor is signed in and the work visit is active.</p>}
+              {!signedIn && startsLater && <p className="visit-ticket-timing-note">This ticket can be started when its approved window begins.</p>}
+            </aside>
+          </div>
+        </section>;
+      })()}
     </div>
   );
 }

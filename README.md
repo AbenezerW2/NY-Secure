@@ -66,6 +66,8 @@ DC-01 visit tickets use the format `01-XXXXXX`. A ticket records:
 
 The visit board shows upcoming, active, delivery, and status information. Each column has its own search field in addition to the general search and status filter.
 
+Selecting a ticket number or double-clicking its row opens that work visit in an internal tab. The ticket view shows the requester/point of contact, work-visit number, customer cage, cabinet scope, approved start/end date and time, comments, delivery details, and the visitor’s contact record. Security must confirm the visitor photo before selecting **Verify photo & start ticket**; starting the ticket is persisted in D1 and changes the visit to active.
+
 Expired tickets disappear immediately when the visitor is not signed in. If the visitor remains signed in after the valid window ends, the ticket stays visible as **Signed in · overdue** and the row receives a red warning outline. Security verification and sign-out update the matching scheduled ticket when the person and ticket identity can be correlated.
 
 ## Alarms and activity
