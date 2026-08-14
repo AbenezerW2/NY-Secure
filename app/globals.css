@@ -1975,6 +1975,7 @@ select:focus-visible {
 .alarm-table.simplified th:nth-child(4) { width: 30%; }
 .alarm-table.simplified th:nth-child(5) { width: 23%; }
 .military-time { font-family: var(--font-geist-mono), monospace; letter-spacing: .04em; }
+.decision-pill.control { color: #5842a7; background: #ece7ff; }
 .activity-empty { display: grid; min-height: 190px; place-items: center; align-content: center; gap: 6px; color: var(--muted); font-size: calc(9px * var(--font-scale)); }
 .event-item { display: grid; grid-template-columns: auto minmax(100px, .8fr) minmax(135px, 1fr) minmax(120px, 1fr) auto; }
 .event-copy small { color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
