@@ -1012,18 +1012,14 @@ select:focus-visible {
 .onsite-contact-card { cursor: default; }
 .contact-card-type.onsite { color: #167b5b; background: #ebf7f2; }
 .contact-card-type.onsite i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 3px rgba(22, 123, 91, .1); }
-.onsite-contact-main { width: 100%; color: inherit; background: transparent; border: 0; cursor: pointer; text-align: left; }
-.onsite-contact-main:disabled { cursor: default; }
-.onsite-contact-main:focus-visible { outline: 3px solid rgba(45, 112, 223, .24); outline-offset: -3px; }
-.onsite-card-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-top: 1px solid #e5ebef; }
-.onsite-card-meta > div { min-width: 0; padding: 10px 13px; border-bottom: 1px solid #edf1f3; }
-.onsite-card-meta > div:nth-child(odd) { border-right: 1px solid #edf1f3; }
-.onsite-card-meta dt { margin-bottom: 4px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
-.onsite-card-meta dd { margin: 0; overflow: hidden; color: var(--ink); font-size: calc(7px * var(--font-scale)); font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
-.onsite-card-meta dd small { display: block; margin-top: 3px; overflow: hidden; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.onsite-card-meta code { font-family: var(--font-geist-mono), monospace; }
-.onsite-contact-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; color: var(--soft-muted); background: #f8fafb; font-size: calc(6px * var(--font-scale)); }
-.onsite-contact-footer .secondary-button { min-height: 31px; flex: 0 0 auto; }
+.onsite-contact-main { grid-template-columns: minmax(0, 1fr) auto; min-height: 88px; gap: 10px; }
+.onsite-profile-trigger { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 0; color: inherit; background: transparent; border: 0; cursor: pointer; text-align: left; }
+.onsite-profile-trigger:disabled { cursor: default; }
+.onsite-profile-trigger:focus-visible { outline: 3px solid rgba(45, 112, 223, .24); outline-offset: 3px; border-radius: 7px; }
+.onsite-card-actions { display: grid; justify-items: end; align-self: stretch; align-content: space-between; gap: 10px; }
+.onsite-signout-button { min-height: 30px; padding: 0 10px; color: #fff; background: #c43d46; border: 1px solid #a92f38; border-radius: 6px; cursor: pointer; font-size: calc(7px * var(--font-scale)); font-weight: 750; white-space: nowrap; }
+.onsite-signout-button:hover { background: #aa3039; }
+.onsite-signout-button:disabled { cursor: not-allowed; opacity: .58; }
 .onsite-search-empty { min-height: 260px; }
 .presence-empty { display: grid; min-height: 330px; place-items: center; align-content: center; gap: 7px; color: var(--soft-muted); text-align: center; }
 .presence-empty > span { font-size: calc(30px * var(--font-scale)); }
@@ -1965,8 +1961,7 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .contact-card-type.customer { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .contact-card-type.internal { color: #8ed6bd; background: #11362e; }
 .app-shell[data-theme="dark"] .contact-card-type.onsite { color: #8ed6bd; background: #11362e; }
-.app-shell[data-theme="dark"] :is(.onsite-directory-toolbar, .onsite-contact-footer) { background: #0c1728; border-color: var(--line); }
-.app-shell[data-theme="dark"] .onsite-card-meta, .app-shell[data-theme="dark"] .onsite-card-meta > div { border-color: var(--line); }
+.app-shell[data-theme="dark"] .onsite-directory-toolbar { background: #0c1728; border-color: var(--line); }
 .app-shell[data-theme="dark"] .data-table tbody tr:focus-within { background: #1a2d48; }
 .app-shell[data-theme="dark"] .tree-branch button:hover,
 .app-shell[data-theme="dark"] .tree-branch button.active { color: #a9c8ff; background: #17345f; }
