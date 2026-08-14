@@ -25,8 +25,9 @@ The console uses a two-level navigation model. The bottom taskbar switches betwe
 - **Organizations** — displays customers, the data-center operator, network providers, contacts, people, and assigned cage inventory.
 - **Scheduled visits** — creates and tracks temporary customer- or NOC-sponsored work-visit tickets with visitor, access, timing, cabinet, comment, and delivery details.
 
-### Alarm center
+### Alarm and controls
 
+- **Command center** — manages every available DC-01 door with persistent remote unlock, lockdown, return-to-badge-control, and time-limited person-specific access commands. Each operator action is recorded in a dedicated audit trail.
 - **Locator** — searches the complete activity log with separate first-name, last-name, and card-number fields. Submitting all fields empty returns each person’s single latest scan from the past 48 hours.
 - **Alarms** — provides a dedicated alarm report with severity and type filters, CSV export, and person-linked actions.
 - **Activity log** — provides the searchable grant/denial audit trail with decision and location filters plus CSV export.
@@ -74,6 +75,8 @@ Security must confirm the visitor photo before selecting **Verify photo & start 
 Expired tickets disappear immediately when the visitor is not signed in. If the visitor remains signed in after the valid window ends, the ticket stays visible as **Signed in · overdue** and the row receives a red warning outline. Security verification and sign-out update the matching scheduled ticket when the person and ticket identity can be correlated.
 
 ## Alarms and activity
+
+Command center controls take priority over ordinary access profiles. A locked-down door rejects every badge; a remotely unlocked door remains open and bypasses badge scanning; normal mode restores scheduled profile checks. Security can also grant one active person access to one door for 15 minutes, 1 hour, or 8 hours without altering their permanent profile. Every command records the door, action, operator, affected person when applicable, and time.
 
 Alarms are separated from customer-directory data and use the report columns:
 

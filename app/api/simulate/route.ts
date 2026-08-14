@@ -24,6 +24,11 @@ type MatchRecord = {
   profileName: string;
 };
 
+type DoorControlRecord = {
+  mode: "NORMAL" | "UNLOCKED" | "LOCKED";
+  grantedPersonId: string | null;
+};
+
 export async function POST(request: Request) {
   try {
     const payload = await readJsonObject(request);
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
     const db = await ensureDatabase();
     const now = new Date().toISOString();
 
-    const [person, zone] = await Promise.all([
+    const [person, zone, doorControl] = await Promise.all([
       db
         .prepare(
           "SELECT id, first_name || ' ' || last_name AS name, active FROM people WHERE id = ?",
@@ -43,6 +48,14 @@ export async function POST(request: Request) {
         .prepare("SELECT id, name, active FROM zones WHERE id = ?")
         .bind(zoneId)
         .first<ZoneRecord>(),
+      db
+        .prepare(
+          `SELECT mode,
+            CASE WHEN datetime(grant_expires_at) >= datetime(?) THEN granted_person_id ELSE NULL END AS grantedPersonId
+           FROM door_controls WHERE zone_id = ?`,
+        )
+        .bind(now, zoneId)
+        .first<DoorControlRecord>(),
     ]);
 
     if (!person) {
@@ -57,12 +70,23 @@ export async function POST(request: Request) {
     let explanation = "No active access profile permits this zone.";
     let match: MatchRecord | null = null;
 
-    if (person.active !== 1) {
-      reasonCode = "PERSON_INACTIVE";
-      explanation = `${person.name} is inactive, so all access attempts are denied.`;
-    } else if (zone.active !== 1) {
+    if (zone.active !== 1) {
       reasonCode = "ZONE_INACTIVE";
       explanation = `${zone.name} is inactive and cannot accept access attempts.`;
+    } else if (doorControl?.mode === "LOCKED") {
+      reasonCode = "COMMAND_LOCKDOWN";
+      explanation = `${zone.name} is locked down by the command center. All credential access is denied.`;
+    } else if (doorControl?.mode === "UNLOCKED") {
+      decision = "GRANTED";
+      reasonCode = "COMMAND_REMOTE_UNLOCK";
+      explanation = `${zone.name} is remotely unlocked and badge scanning is bypassed.`;
+    } else if (person.active !== 1) {
+      reasonCode = "PERSON_INACTIVE";
+      explanation = `${person.name} is inactive, so all access attempts are denied.`;
+    } else if (doorControl?.grantedPersonId === personId) {
+      decision = "GRANTED";
+      reasonCode = "COMMAND_PERSON_GRANT";
+      explanation = `${person.name} has an active command-center grant for ${zone.name}.`;
     } else {
       match = await db
         .prepare(
@@ -135,7 +159,7 @@ export async function POST(request: Request) {
       )
       .run();
 
-    if (decision === "DENIED") {
+    if (decision === "DENIED" && reasonCode !== "COMMAND_LOCKDOWN") {
       const alarmType = {
         ZONE_NOT_PERMITTED: "WRONG_DOOR",
         NO_ACTIVE_ASSIGNMENT: "EXPIRED_CARD",

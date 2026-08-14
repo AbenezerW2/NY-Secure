@@ -593,6 +593,23 @@ const schemaStatements = [
     occurred_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS door_controls (
+    zone_id TEXT PRIMARY KEY NOT NULL REFERENCES zones(id),
+    mode TEXT NOT NULL DEFAULT 'NORMAL' CHECK (mode IN ('NORMAL', 'UNLOCKED', 'LOCKED')),
+    granted_person_id TEXT REFERENCES people(id),
+    grant_expires_at TEXT,
+    updated_by TEXT NOT NULL DEFAULT 'Maya Brooks',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS door_control_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    zone_id TEXT NOT NULL REFERENCES zones(id),
+    person_id TEXT REFERENCES people(id),
+    action TEXT NOT NULL CHECK (action IN ('UNLOCK', 'LOCK', 'NORMAL', 'GRANT_PERSON')),
+    detail TEXT NOT NULL DEFAULT '',
+    operator_name TEXT NOT NULL DEFAULT 'Maya Brooks',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS scheduled_visits (
     ticket_number TEXT PRIMARY KEY NOT NULL,
     site_code TEXT NOT NULL DEFAULT 'DC-01',
@@ -644,6 +661,9 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS idx_alarms_occurred_at ON alarms(occurred_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_type_status ON alarms(alarm_type, status)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_zone_occurred_at ON alarms(zone_id, occurred_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_door_controls_mode ON door_controls(mode)",
+  "CREATE INDEX IF NOT EXISTS idx_door_control_events_created_at ON door_control_events(created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_door_control_events_zone_created_at ON door_control_events(zone_id, created_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_valid_from ON scheduled_visits(valid_from DESC)",
   "CREATE INDEX IF NOT EXISTS idx_scheduled_visits_organization_valid_from ON scheduled_visits(organization_id, valid_from DESC)",
   "CREATE INDEX IF NOT EXISTS idx_site_check_ins_status_requested_at ON site_check_ins(status, requested_at DESC)",
