@@ -1927,7 +1927,7 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
 
   return (
     <div className="locator-layout">
-      <section className="panel directory-panel people-directory locator-directory">
+      <section className="panel directory-panel people-directory locator-directory locator-workspace-card">
         <div className="people-search-header">
           <div><p className="eyebrow">Activity-log lookup</p><h2>Find a last-known scan</h2><p>Search by first name, last name, and/or card number. Populated fields must all match. Use * as a wildcard.</p></div>
         </div>
@@ -1940,17 +1940,11 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
           </div>
         </form>
         <div className="locator-mode-note"><span>48h</span><p><strong>Empty-search mode</strong> scans the activity log and returns each person’s single most recent location within the last 48 hours.</p></div>
-      </section>
 
-      {!searchRequest && <section className="panel locator-waiting"><span aria-hidden="true">⌖</span><h2>Ready to locate</h2><p>Enter one or more identity fields, or submit all three empty fields for the 48-hour roster.</p></section>}
+        {!searchRequest && <div className="locator-waiting"><span aria-hidden="true">⌖</span><h2>Ready to locate</h2><p>Enter one or more identity fields, or submit all three empty fields for the 48-hour roster.</p></div>}
 
-      {searchRequest && <section className="locator-results">
-        <div className="locator-summary-grid">
-          <article className="panel"><span>People located</span><strong>{results.length}</strong><small>{hasSearchCriteria ? "Matching all entered fields" : "With a scan in the last 48 hours"}</small></article>
-          <article className="panel"><span>Last scan granted</span><strong>{grantedCount}</strong><small>Latest successful access decisions</small></article>
-          <article className="panel"><span>Locations represented</span><strong>{locationCount}</strong><small>Unique last-known access points</small></article>
-        </div>
-        <section className="panel directory-panel locator-results-panel">
+        {searchRequest && <div className="locator-inline-results">
+          <section className="locator-results-panel">
           <header><div><p className="eyebrow">{hasSearchCriteria ? "Complete log search" : "Past 48 hours"}</p><h2>{hasSearchCriteria ? "Latest matching scans" : "Everyone’s latest scan"}</h2><p>{hasSearchCriteria ? searchDescription : "One most-recent activity-log result per person."}</p></div><span className="result-count">{results.length} {results.length === 1 ? "person" : "people"}</span></header>
           <div className="table-wrap"><table className="data-table locator-table"><thead><tr><th>Who</th><th>Customer</th><th>Last location</th><th>Decision</th><th>Last scan</th></tr></thead><tbody>{results.map(({ event, person, organization }) => <tr key={event.personId || event.id}>
             <td><strong>{person ? `${person.firstName} ${person.lastName}` : event.personName || "Unknown credential"}</strong><small>{person?.badgeId || "No linked badge"}</small></td>
@@ -1959,8 +1953,14 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
             <td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{label(event.reasonCode)}</small></td>
             <td><strong>{formatDate(event.occurredAt)} · {formatTime(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td>
           </tr>)}</tbody></table>{results.length === 0 && <div className="activity-empty"><strong>No matching scans found</strong><span>{hasSearchCriteria ? "Try different first-name, last-name, or card-number values." : "No one has a recorded scan in the past 48 hours."}</span></div>}</div>
-        </section>
-      </section>}
+          </section>
+          <footer className="locator-summary-footer" aria-label="Locator result summary">
+            <span><b>{results.length}</b> people located</span>
+            <span><b>{grantedCount}</b> last scans granted</span>
+            <span><b>{locationCount}</b> locations represented</span>
+          </footer>
+        </div>}
+      </section>
     </div>
   );
 }
