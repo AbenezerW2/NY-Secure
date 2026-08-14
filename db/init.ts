@@ -606,6 +606,7 @@ const schemaStatements = [
     valid_from TEXT NOT NULL,
     valid_until TEXT NOT NULL,
     comments TEXT NOT NULL DEFAULT '',
+    allowed_hours TEXT NOT NULL DEFAULT '{}',
     has_delivery INTEGER NOT NULL DEFAULT 0 CHECK (has_delivery IN (0, 1)),
     package_count INTEGER NOT NULL DEFAULT 0 CHECK (package_count >= 0),
     package_details TEXT NOT NULL DEFAULT '',
@@ -669,6 +670,18 @@ async function seedDatabase(db: D1Database) {
   const now = new Date();
   const validFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const visitorValidUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  const allHoursForRange = (start: Date, end: Date) => {
+    const dates = new Set<string>();
+    const formatter = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+    for (let cursor = start.getTime(); cursor <= end.getTime(); cursor += 60 * 60 * 1000) {
+      const parts = Object.fromEntries(formatter.formatToParts(new Date(cursor)).map((part) => [part.type, part.value]));
+      dates.add(`${parts.year}-${parts.month}-${parts.day}`);
+    }
+    const endParts = Object.fromEntries(formatter.formatToParts(end).map((part) => [part.type, part.value]));
+    dates.add(`${endParts.year}-${endParts.month}-${endParts.day}`);
+    return JSON.stringify(Object.fromEntries([...dates].map((date) => [date, Array.from({ length: 24 }, (_, hour) => hour)])));
+  };
 
   // Release the unique slug before inserting the renamed operator record.
   // Existing installations can still have the former operator ID attached to
@@ -1043,9 +1056,9 @@ async function seedDatabase(db: D1Database) {
           `INSERT INTO scheduled_visits
             (ticket_number, site_code, organization_id, requester_name, visitor_name,
              visitor_email, visitor_phone, cage_zone_id, cabinet_access,
-             valid_from, valid_until, comments, has_delivery, package_count,
+             valid_from, valid_until, comments, allowed_hours, has_delivery, package_count,
              package_details, status)
-           VALUES (?, 'DC-01', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+           VALUES (?, 'DC-01', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
            ON CONFLICT(ticket_number) DO UPDATE SET
              organization_id = excluded.organization_id,
              requester_name = excluded.requester_name,
@@ -1057,6 +1070,7 @@ async function seedDatabase(db: D1Database) {
              valid_from = excluded.valid_from,
              valid_until = excluded.valid_until,
              comments = excluded.comments,
+             allowed_hours = excluded.allowed_hours,
              has_delivery = excluded.has_delivery,
              package_count = excluded.package_count,
              package_details = excluded.package_details,
@@ -1074,6 +1088,7 @@ async function seedDatabase(db: D1Database) {
           validFrom.toISOString(),
           validUntil.toISOString(),
           visit.comments,
+          allHoursForRange(validFrom, validUntil),
           visit.hasDelivery,
           visit.packageCount,
           visit.packageDetails,
@@ -1165,6 +1180,9 @@ export async function ensureDatabase() {
       }
       if (!scheduledVisitColumns.results.some((column) => column.name === "signed_out_at")) {
         await db.prepare("ALTER TABLE scheduled_visits ADD COLUMN signed_out_at TEXT").run();
+      }
+      if (!scheduledVisitColumns.results.some((column) => column.name === "allowed_hours")) {
+        await db.prepare("ALTER TABLE scheduled_visits ADD COLUMN allowed_hours TEXT NOT NULL DEFAULT '{}'").run();
       }
       await seedDatabase(db);
       const missingPins = await db.prepare("SELECT id FROM people WHERE ibx_access_pin = '' ORDER BY created_at, id").all<{ id: string }>();

@@ -97,6 +97,7 @@ type ScheduledVisitRow = {
   validFrom: string;
   validUntil: string;
   comments: string;
+  allowedHours: string;
   hasDelivery: number | boolean;
   packageCount: number;
   packageDetails: string;
@@ -266,6 +267,7 @@ export async function getState(db: D1Database) {
           v.cage_zone_id AS cageZoneId, z.name AS cageName,
           v.cabinet_access AS cabinetAccess, v.valid_from AS validFrom,
           v.valid_until AS validUntil, v.comments,
+          v.allowed_hours AS allowedHours,
           v.has_delivery AS hasDelivery, v.package_count AS packageCount,
           v.package_details AS packageDetails,
           v.signed_in_at AS signedInAt, v.signed_out_at AS signedOutAt,
@@ -381,15 +383,25 @@ export async function getState(db: D1Database) {
   });
   const scheduledVisits = visitResult.results.map((visit) => {
     let cabinetAccess: string[] = [];
+    let allowedHours: Record<string, number[]> = {};
     try {
       const parsed = JSON.parse(visit.cabinetAccess) as unknown;
       if (Array.isArray(parsed)) cabinetAccess = parsed.map(String);
     } catch {
       cabinetAccess = visit.cabinetAccess.split(",").map((item) => item.trim()).filter(Boolean);
     }
+    try {
+      const parsed = JSON.parse(visit.allowedHours) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        allowedHours = Object.fromEntries(Object.entries(parsed).map(([date, hours]) => [date, Array.isArray(hours) ? hours.map(Number).filter((hour) => Number.isInteger(hour) && hour >= 0 && hour <= 23) : []]));
+      }
+    } catch {
+      allowedHours = {};
+    }
     return {
       ...visit,
       cabinetAccess,
+      allowedHours,
       hasDelivery: asBoolean(visit.hasDelivery),
     };
   });

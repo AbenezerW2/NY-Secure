@@ -9,6 +9,48 @@ import { ensureDatabase } from "@/db/init";
 
 const SITE_CODE = "DC-01";
 const TICKET_PREFIX = "01";
+const SITE_TIME_ZONE = "America/New_York";
+
+function siteDateAndHour(value: Date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: SITE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value).map((part) => [part.type, part.value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+}
+
+function visitDateKeys(start: Date, end: Date) {
+  const dates = new Set<string>();
+  for (let cursor = start.getTime(); cursor <= end.getTime(); cursor += 60 * 60 * 1000) {
+    dates.add(siteDateAndHour(new Date(cursor)).date);
+  }
+  dates.add(siteDateAndHour(end).date);
+  return [...dates];
+}
+
+function parseAllowedHours(value: unknown, requiredDates: string[]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "VISIT_HOURS_REQUIRED", "Select the authorized hours for every date in the visit.");
+  }
+  const source = value as Record<string, unknown>;
+  const schedule: Record<string, number[]> = {};
+  for (const date of requiredDates) {
+    const rawHours = source[date];
+    if (!Array.isArray(rawHours)) {
+      throw new ApiError(400, "VISIT_HOURS_REQUIRED", `Select at least one authorized hour for ${date}.`);
+    }
+    const hours = Array.from(new Set(rawHours.map(Number))).sort((a, b) => a - b);
+    if (hours.length === 0 || hours.some((hour) => !Number.isInteger(hour) || hour < 0 || hour > 23)) {
+      throw new ApiError(400, "INVALID_VISIT_HOURS", `${date} must list one or more whole hours from 00 through 23.`);
+    }
+    schedule[date] = hours;
+  }
+  return schedule;
+}
 
 function parseDateTime(value: string, field: string) {
   const date = new Date(value);
@@ -62,8 +104,8 @@ export async function POST(request: Request) {
     if (visitorPhone && !/^[+()0-9.\-\s]{7,40}$/.test(visitorPhone)) {
       throw new ApiError(400, "INVALID_PHONE", "Visitor phone must be a valid phone number.");
     }
-    if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 168) {
-      throw new ApiError(400, "INVALID_DURATION", "Visit duration must be between 1 and 168 hours.");
+    if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 744) {
+      throw new ApiError(400, "INVALID_DURATION", "Visit duration must be between 1 and 744 hours.");
     }
     if (!Number.isInteger(packageCount) || packageCount < 0 || packageCount > 999) {
       throw new ApiError(400, "INVALID_PACKAGE_COUNT", "Package count must be between 0 and 999.");
@@ -73,6 +115,7 @@ export async function POST(request: Request) {
     }
 
     const validUntil = new Date(validFrom.getTime() + durationHours * 60 * 60 * 1000);
+    const allowedHours = parseAllowedHours(payload.allowedHours, visitDateKeys(validFrom, validUntil));
     const db = await ensureDatabase();
     const [organization, cage] = await Promise.all([
       db
@@ -103,9 +146,9 @@ export async function POST(request: Request) {
           `INSERT OR IGNORE INTO scheduled_visits
             (ticket_number, site_code, organization_id, requester_name, visitor_name,
              visitor_email, visitor_phone, cage_zone_id, cabinet_access,
-             valid_from, valid_until, comments, has_delivery, package_count,
+             valid_from, valid_until, comments, allowed_hours, has_delivery, package_count,
              package_details, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`,
         )
         .bind(
           ticketNumber,
@@ -120,6 +163,7 @@ export async function POST(request: Request) {
           validFrom.toISOString(),
           validUntil.toISOString(),
           comments,
+          JSON.stringify(allowedHours),
           hasDelivery ? 1 : 0,
           packageCount,
           packageDetails,
@@ -155,11 +199,11 @@ export async function PATCH(request: Request) {
       .prepare(
         `SELECT ticket_number AS ticketNumber, status, valid_from AS validFrom,
           valid_until AS validUntil, signed_in_at AS signedInAt,
-          signed_out_at AS signedOutAt
+          signed_out_at AS signedOutAt, allowed_hours AS allowedHours
          FROM scheduled_visits WHERE ticket_number = ?`,
       )
       .bind(ticketNumber)
-      .first<{ ticketNumber: string; status: string; validFrom: string; validUntil: string; signedInAt: string | null; signedOutAt: string | null }>();
+      .first<{ ticketNumber: string; status: string; validFrom: string; validUntil: string; signedInAt: string | null; signedOutAt: string | null; allowedHours: string }>();
 
     if (!visit) {
       throw new ApiError(404, "VISIT_NOT_FOUND", "The work visit ticket was not found.");
@@ -180,6 +224,16 @@ export async function PATCH(request: Request) {
     }
     if (now.getTime() > new Date(visit.validUntil).getTime()) {
       throw new ApiError(409, "VISIT_EXPIRED", "The work-visit ticket has expired.");
+    }
+    let allowedHours: Record<string, number[]> = {};
+    try {
+      allowedHours = JSON.parse(visit.allowedHours) as Record<string, number[]>;
+    } catch {
+      allowedHours = {};
+    }
+    const currentSiteTime = siteDateAndHour(now);
+    if (!Array.isArray(allowedHours[currentSiteTime.date]) || !allowedHours[currentSiteTime.date].includes(currentSiteTime.hour)) {
+      throw new ApiError(409, "VISIT_TIME_NOT_ALLOWED", "Please check the time. This ticket is not authorized for the current hour.");
     }
 
     const signedInAt = now.toISOString();

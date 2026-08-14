@@ -230,6 +230,7 @@ export const scheduledVisits = sqliteTable(
     validFrom: text("valid_from").notNull(),
     validUntil: text("valid_until").notNull(),
     comments: text("comments").notNull().default(""),
+    allowedHours: text("allowed_hours").notNull().default("{}"),
     hasDelivery: integer("has_delivery", { mode: "boolean" }).notNull().default(false),
     packageCount: integer("package_count").notNull().default(0),
     packageDetails: text("package_details").notNull().default(""),

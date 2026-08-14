@@ -1,0 +1,1 @@
+ALTER TABLE `scheduled_visits` ADD `allowed_hours` text DEFAULT '{}' NOT NULL;

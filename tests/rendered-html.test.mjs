@@ -61,9 +61,16 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Work visit number/);
   assert.match(consoleSource, /Photo verified/);
   assert.match(consoleSource, /Verify photo & start ticket/);
+  assert.match(consoleSource, /NOC \/ POC comments/);
+  assert.match(consoleSource, /Authorized work hours/);
+  assert.match(consoleSource, /Choose at least one hour for every listed date/);
+  assert.match(consoleSource, /Please check the time/);
   assert.match(consoleSource, /method: "PATCH"/);
   assert.match(visitsRoute, /export async function PATCH/);
   assert.match(visitsRoute, /PHOTO_VERIFICATION_REQUIRED/);
+  assert.match(visitsRoute, /VISIT_HOURS_REQUIRED/);
+  assert.match(visitsRoute, /VISIT_TIME_NOT_ALLOWED/);
+  assert.match(visitsRoute, /America\/New_York/);
   assert.match(visitsRoute, /SET signed_in_at = \?, status = 'ACTIVE'/);
   assert.match(consoleSource, /Signed in · overdue/);
   assert.match(consoleSource, /effectiveVisitStatus/);
@@ -137,6 +144,7 @@ test("ships durable access-control capabilities instead of starter artifacts", a
   assert.match(schema, /export const alarms/);
   assert.match(schema, /export const scheduledVisits/);
   assert.match(schema, /signedInAt:\s*text\("signed_in_at"\)/);
+  assert.match(schema, /allowedHours:\s*text\("allowed_hours"\)/);
   assert.match(schema, /export const siteCheckIns/);
   assert.match(schema, /idx_site_check_ins_person_open/);
   assert.match(schema, /phoneNumber:\s*text\("phone_number"\)/);
