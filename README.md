@@ -60,13 +60,16 @@ DC-01 visit tickets use the format `01-XXXXXX`. A ticket records:
 - requesting customer or NY-Secure NOC;
 - requester and visitor identity/contact details;
 - customer cage and permitted cabinet references;
-- start time and a validity duration from 1 to 168 hours;
+- start time and a validity duration from 1 to 744 hours;
+- a mandatory, explicit list of authorized 24-hour clock values for every calendar date in the visit;
 - optional comments; and
 - delivery status, package count, and package details.
 
 The visit board shows upcoming, active, delivery, and status information. Each column has its own search field in addition to the general search and status filter.
 
-Selecting a ticket number or double-clicking its row opens that work visit in an internal tab. The ticket view shows the requester/point of contact, work-visit number, customer cage, cabinet scope, approved start/end date and time, comments, delivery details, and the visitor’s contact record. Security must confirm the visitor photo before selecting **Verify photo & start ticket**; starting the ticket is persisted in D1 and changes the visit to active.
+Selecting a ticket number or double-clicking its row opens that work visit in an internal tab. The ticket view shows the requester/point of contact, work-visit number, customer cage, cabinet scope, approved start/end date and time, delivery details, and the visitor’s contact record. A separate **NOC / POC comments** tab shows any requester instructions plus every authorized hour in an explicit format such as `2026-08-16: 08, 09, 10, 11`.
+
+Security must confirm the visitor photo before selecting **Verify photo & start ticket**. The server checks both the overall validity window and the current DC-01 date/hour against the mandatory schedule. An attempt outside the approved hours is blocked with a **Please check the time** popup; a successful start is persisted in D1 and changes the visit to active.
 
 Expired tickets disappear immediately when the visitor is not signed in. If the visitor remains signed in after the valid window ends, the ticket stays visible as **Signed in · overdue** and the row receives a red warning outline. Security verification and sign-out update the matching scheduled ticket when the person and ticket identity can be correlated.
 

@@ -1383,6 +1383,23 @@ select:focus-visible {
 .visit-delivery-toggle > span { display: grid; gap: 3px; }
 .visit-delivery-toggle strong { color: #3b5358; font-size: calc(8px * var(--font-scale)); }
 .visit-delivery-toggle small { color: #829094; font-size: calc(7px * var(--font-scale)); }
+.visit-hours-builder { min-width: 0; padding: 14px; margin: 0; background: #f8fafc; border: 1px solid #dce5eb; border-radius: 9px; }
+.visit-hours-builder legend { padding: 0 6px; color: var(--ink); font-size: calc(8px * var(--font-scale)); font-weight: 750; }
+.visit-hours-builder legend b { margin-left: 6px; color: var(--red); font-size: calc(6px * var(--font-scale)); letter-spacing: .07em; text-transform: uppercase; }
+.visit-hours-builder > p { margin: 0 0 12px; color: var(--muted); font-size: calc(7px * var(--font-scale)); }
+.visit-hours-days { display: grid; gap: 10px; max-height: 390px; overflow-y: auto; }
+.visit-hours-day { padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.visit-hours-day > header { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.visit-hours-day > header strong { color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--font-scale)); }
+.visit-hours-day > header span { flex: 1; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); }
+.visit-hours-day > header button { padding: 4px 7px; color: #2768c8; background: #edf4ff; border: 0; border-radius: 5px; cursor: pointer; font-size: calc(6px * var(--font-scale)); font-weight: 700; }
+.hour-checkbox-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; }
+.hour-checkbox-grid label { display: block; cursor: pointer; }
+.hour-checkbox-grid input { position: absolute; opacity: 0; pointer-events: none; }
+.hour-checkbox-grid span { display: grid; min-height: 27px; place-items: center; color: var(--muted); background: #f3f6f8; border: 1px solid var(--line); border-radius: 5px; font-family: var(--font-geist-mono), monospace; font-size: calc(6px * var(--font-scale)); }
+.hour-checkbox-grid input:checked + span { color: #fff; background: #286ed8; border-color: #286ed8; }
+.hour-checkbox-grid input:focus-visible + span { outline: 2px solid #65a7ff; outline-offset: 1px; }
+.visit-hours-required { display: block; margin-top: 9px; color: var(--red); font-size: calc(7px * var(--font-scale)); }
 
 .drawer-backdrop { display: flex; justify-content: flex-end; padding: 0; }
 .person-drawer { position: relative; width: min(440px, 100%); height: 100%; padding: 26px; background: #fff; box-shadow: -20px 0 60px rgba(4, 22, 26, .22); overflow-y: auto; animation: slide-in 180ms ease-out; }
@@ -1799,6 +1816,10 @@ select:focus-visible {
 .visit-ticket-error { padding: 10px 25px; color: var(--red); background: var(--red-soft); border-bottom: 1px solid #edcccc; font-size: calc(8px * var(--font-scale)); }
 .visit-ticket-detail-layout { display: grid; min-height: 560px; grid-template-columns: minmax(0, 1fr) 330px; }
 .visit-ticket-information { min-width: 0; padding: 27px; }
+.visit-detail-tabs { display: flex; gap: 4px; margin: -10px 0 22px; border-bottom: 1px solid var(--line); }
+.visit-detail-tabs button { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; font-size: calc(8px * var(--font-scale)); font-weight: 700; }
+.visit-detail-tabs button.active { color: #2768c8; border-bottom-color: #2768c8; }
+.visit-detail-tabs b { display: grid; min-width: 17px; height: 17px; place-items: center; color: #fff; background: #286ed8; border-radius: 9px; font-size: calc(6px * var(--font-scale)); }
 .visit-ticket-section-heading h3 { margin: 4px 0 0; color: var(--ink); font-size: calc(18px * var(--font-scale)); }
 .visit-ticket-section-heading p:last-child { margin: 6px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
 .visit-ticket-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin: 23px 0 0; }
@@ -1810,6 +1831,21 @@ select:focus-visible {
 .visit-ticket-facts dd > small { margin-top: 4px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); font-weight: 500; }
 .visit-ticket-facts code { color: #2768c8; font-family: var(--font-geist-mono), monospace; }
 .visit-ticket-facts .cabinet-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.visit-comments-panel { display: grid; gap: 17px; }
+.visit-comment-card { padding: 16px; background: #f8fafb; border: 1px solid var(--line); border-radius: 9px; }
+.visit-comment-card header { display: grid; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.visit-comment-card header strong { color: var(--ink); font-size: calc(9px * var(--font-scale)); }
+.visit-comment-card header span { color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); }
+.visit-comment-card p { margin: 12px 0 0; color: var(--muted); font-size: calc(9px * var(--font-scale)); line-height: 1.6; }
+.visit-authorized-hours { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; }
+.visit-authorized-hours > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: #f4f7fa; border-bottom: 1px solid var(--line); }
+.visit-authorized-hours h4 { margin: 3px 0 0; color: var(--ink); font-size: calc(11px * var(--font-scale)); }
+.visit-authorized-hours > header > span { color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); }
+.visit-authorized-hour-row { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+.visit-authorized-hour-row:last-child { border-bottom: 0; }
+.visit-authorized-hour-row code { color: #2768c8; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--font-scale)); font-weight: 750; }
+.visit-authorized-hour-row span { color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--font-scale)); line-height: 1.55; }
+.visit-hours-missing { margin: 0; padding: 14px 16px; color: var(--red); background: var(--red-soft); font-size: calc(8px * var(--font-scale)); }
 .visit-ticket-identity { padding: 28px 24px; background: #f5f8fc; border-left: 1px solid var(--line); }
 .visit-photo-frame { display: grid; justify-items: start; gap: 8px; margin-bottom: 22px; }
 .visit-photo-frame .blank-contact-photo { width: 92px; height: 92px; margin: 0; }
@@ -1828,6 +1864,13 @@ select:focus-visible {
 .visit-ticket-active-note, .visit-ticket-timing-note { margin: 12px 0 0; color: var(--muted); font-size: calc(7px * var(--font-scale)); line-height: 1.5; }
 .visit-ticket-active-note { color: #167b5b; }
 .visit-ticket-active-note span { margin-right: 5px; }
+.visit-time-popup-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: rgba(7, 18, 30, .68); backdrop-filter: blur(3px); }
+.visit-time-popup { display: grid; width: min(420px, 100%); justify-items: center; padding: 27px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 28px 80px rgba(4, 22, 26, .35); text-align: center; }
+.visit-time-popup > span { display: grid; width: 52px; height: 52px; place-items: center; color: #b56a00; background: #fff0d6; border-radius: 50%; font-size: calc(24px * var(--font-scale)); }
+.visit-time-popup h2 { margin: 15px 0 8px; font-size: calc(18px * var(--font-scale)); }
+.visit-time-popup p { margin: 0; color: var(--muted); font-size: calc(9px * var(--font-scale)); line-height: 1.55; }
+.visit-time-popup small { margin-top: 8px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); line-height: 1.5; }
+.visit-time-popup button { min-width: 120px; margin-top: 18px; }
 .locator-layout, .locator-results { display: grid; gap: 16px; }
 .locator-search-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
 .locator-directory .locator-mode-note { margin: 14px 26px 20px; }
@@ -1948,7 +1991,8 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .locator-mode-note > span { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .overdue-visit td { background: #351b24; }
 .app-shell[data-theme="dark"] .visits-table th > input { background: #0c1728; border-color: var(--line); }
-.app-shell[data-theme="dark"] :is(.visit-ticket-facts > div, .visit-ticket-identity, .visit-photo-verification) { background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.visit-ticket-facts > div, .visit-ticket-identity, .visit-photo-verification, .visit-comment-card, .visit-hours-day, .visit-hours-builder) { background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.visit-authorized-hours > header, .hour-checkbox-grid span) { background: #0c1728; border-color: var(--line); }
 .app-shell[data-theme="dark"] .visit-ticket-facts code, .app-shell[data-theme="dark"] .visit-ticket-identity a { color: #a9c8ff; }
 
 @media (max-width: 1450px) {
@@ -2011,6 +2055,10 @@ select:focus-visible {
   .visit-ticket-detail-header { align-items: flex-start; padding: 19px 17px; }
   .visit-ticket-detail-layout { min-height: 0; grid-template-columns: 1fr; }
   .visit-ticket-information { padding: 22px 17px; }
+  .hour-checkbox-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .visit-hours-day > header { align-items: flex-start; flex-wrap: wrap; }
+  .visit-hours-day > header span { flex-basis: 100%; order: 3; }
+  .visit-authorized-hour-row { grid-template-columns: 1fr; gap: 5px; }
   .visit-ticket-facts { grid-template-columns: 1fr; }
   .visit-ticket-facts > div.wide { grid-column: 1; }
   .visit-ticket-identity { padding: 24px 18px; border-top: 1px solid var(--line); border-left: 0; }

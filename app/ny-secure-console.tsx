@@ -115,6 +115,7 @@ type ScheduledVisit = {
   validFrom: string;
   validUntil: string;
   comments: string;
+  allowedHours: Record<string, number[]>;
   hasDelivery: boolean;
   packageCount: number;
   packageDetails: string;
@@ -122,6 +123,33 @@ type ScheduledVisit = {
   signedOutAt?: string | null;
   status: "SCHEDULED" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "OVERDUE";
 };
+
+const SITE_TIME_ZONE = "America/New_York";
+const HOURS_24 = Array.from({ length: 24 }, (_, hour) => hour);
+
+function siteDateKey(value: Date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: SITE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function visitDateKeys(validFrom: string, durationHours: number) {
+  const start = new Date(validFrom);
+  if (Number.isNaN(start.getTime()) || !Number.isFinite(durationHours)) return [];
+  const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+  const dates = new Set<string>();
+  for (let cursor = start.getTime(); cursor <= end.getTime(); cursor += 60 * 60 * 1000) dates.add(siteDateKey(new Date(cursor)));
+  dates.add(siteDateKey(end));
+  return [...dates];
+}
+
+function formatVisitHours(hours: number[]) {
+  return [...hours].sort((a, b) => a - b).map((hour) => String(hour).padStart(2, "0")).join(", ");
+}
 
 type SiteCheckIn = {
   id: string;
@@ -499,6 +527,9 @@ function normalizeState(source: {
     validFrom: String(item.validFrom),
     validUntil: String(item.validUntil),
     comments: String(item.comments ?? ""),
+    allowedHours: item.allowedHours && typeof item.allowedHours === "object" && !Array.isArray(item.allowedHours)
+      ? Object.fromEntries(Object.entries(item.allowedHours).map(([date, hours]) => [date, Array.isArray(hours) ? hours.map(Number).filter((hour) => Number.isInteger(hour) && hour >= 0 && hour <= 23) : []]))
+      : {},
     hasDelivery: item.hasDelivery === true,
     packageCount: Number(item.packageCount ?? 0),
     packageDetails: String(item.packageDetails ?? ""),
@@ -1677,6 +1708,8 @@ function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVis
   const [photoVerified, setPhotoVerified] = useState<Record<string, boolean>>({});
   const [startingTicket, setStartingTicket] = useState<string | null>(null);
   const [ticketError, setTicketError] = useState("");
+  const [ticketPanels, setTicketPanels] = useState<Record<string, "details" | "comments">>({});
+  const [timePopup, setTimePopup] = useState<string | null>(null);
   const [visitClock, setVisitClock] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setVisitClock(Date.now()), 1000);
@@ -1728,8 +1761,11 @@ function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVis
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ticketNumber: visit.ticketNumber, action: "START", photoVerified: photoVerified[visit.ticketNumber] === true }),
       });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "The work visit could not be started.");
+      const result = (await response.json()) as { error?: string; code?: string };
+      if (!response.ok) {
+        if (result.code === "VISIT_TIME_NOT_ALLOWED") setTimePopup(result.error || "Please check the time.");
+        throw new Error(result.error || "The work visit could not be started.");
+      }
       await onVisitsChanged();
       setPhotoVerified((current) => ({ ...current, [visit.ticketNumber]: false }));
     } catch (error) {
@@ -1796,12 +1832,14 @@ function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVis
         const startsLater = visitClock < startsAt;
         const expired = visitClock > endsAt;
         const canStart = !signedIn && activeTicket.status !== "CANCELLED" && !startsLater && !expired;
+        const activePanel = ticketPanels[activeTicket.ticketNumber] ?? "details";
         return <section className={`panel visit-ticket-detail ${effectiveStatus === "OVERDUE" ? "overdue" : ""}`}>
           <header className="visit-ticket-detail-header"><div><p className="eyebrow">DC-01 work visit</p><h2>{activeTicket.ticketNumber}</h2><p>Security ticket record and visitor admission workflow.</p></div><span className={`visit-status ${effectiveStatus.toLowerCase()}`}><i />{effectiveStatus === "OVERDUE" ? "Signed in · overdue" : label(effectiveStatus)}</span></header>
           {ticketError && <div className="visit-ticket-error" role="alert">{ticketError}</div>}
           <div className="visit-ticket-detail-layout">
             <section className="visit-ticket-information">
-              <div className="visit-ticket-section-heading"><p className="eyebrow">Work authorization</p><h3>Ticket information</h3><p>The approved access scope and schedule for this visit.</p></div>
+              <nav className="visit-detail-tabs" aria-label="Work visit ticket sections"><button className={activePanel === "details" ? "active" : ""} onClick={() => setTicketPanels((current) => ({ ...current, [activeTicket.ticketNumber]: "details" }))} type="button">Ticket details</button><button className={activePanel === "comments" ? "active" : ""} onClick={() => setTicketPanels((current) => ({ ...current, [activeTicket.ticketNumber]: "comments" }))} type="button">NOC / POC comments{activeTicket.comments ? <b>1</b> : null}</button></nav>
+              {activePanel === "details" ? <><div className="visit-ticket-section-heading"><p className="eyebrow">Work authorization</p><h3>Ticket information</h3><p>The approved access scope and overall validity window for this visit.</p></div>
               <dl className="visit-ticket-facts">
                 <div className="wide"><dt>Point of contact</dt><dd><strong>{activeTicket.requesterName}</strong><small>{activeTicket.organizationName}</small></dd></div>
                 <div><dt>Work visit number</dt><dd><code>{activeTicket.ticketNumber}</code></dd></div>
@@ -1810,9 +1848,15 @@ function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVis
                 <div><dt>Cabinets</dt><dd><span className="cabinet-tags">{activeTicket.cabinetAccess.map((cabinet) => <span key={cabinet}>{cabinet}</span>)}</span></dd></div>
                 <div><dt>Ticket starts</dt><dd><strong>{formatDate(activeTicket.validFrom)}</strong><small>{formatTime(activeTicket.validFrom)} · 24-hour time</small></dd></div>
                 <div><dt>Ticket ends</dt><dd><strong>{formatDate(activeTicket.validUntil)}</strong><small>{formatTime(activeTicket.validUntil)} · {formatOnSiteDuration(activeTicket.validFrom, activeTicket.validUntil)} window</small></dd></div>
-                <div className="wide"><dt>Work instructions / comments</dt><dd>{activeTicket.comments || "No additional instructions were added."}</dd></div>
                 <div className="wide"><dt>Delivery</dt><dd>{activeTicket.hasDelivery ? <><strong>{activeTicket.packageCount} package{activeTicket.packageCount === 1 ? "" : "s"}</strong><small>{activeTicket.packageDetails || "Package delivery attached to this visit."}</small></> : "No delivery is attached to this visit."}</dd></div>
-              </dl>
+              </dl></> : <div className="visit-comments-panel">
+                <div className="visit-ticket-section-heading"><p className="eyebrow">Requester instructions</p><h3>NOC / point-of-contact comments</h3><p>Review comments and every explicitly approved working hour before starting the visit.</p></div>
+                <article className="visit-comment-card"><header><strong>{activeTicket.requesterName}</strong><span>{activeTicket.organizationName}</span></header><p>{activeTicket.comments || "No comments were added by the NOC or point of contact."}</p></article>
+                <section className="visit-authorized-hours"><header><div><p className="eyebrow">Mandatory schedule</p><h4>Authorized work hours</h4></div><span>DC-01 · 24-hour clock</span></header>
+                  {Object.entries(activeTicket.allowedHours).sort(([a], [b]) => a.localeCompare(b)).map(([date, hours]) => <div className="visit-authorized-hour-row" key={date}><code>{date}:</code><span>{formatVisitHours(hours)}</span></div>)}
+                  {Object.keys(activeTicket.allowedHours).length === 0 && <p className="visit-hours-missing">No authorized hours are recorded. This ticket cannot be started.</p>}
+                </section>
+              </div>}
             </section>
             <aside className="visit-ticket-identity">
               <div className="visit-photo-frame"><span className="blank-contact-photo" aria-label="Visitor photo placeholder"><i /><b /></span><em>Visitor photo</em></div>
@@ -1826,6 +1870,7 @@ function ScheduledVisitsView({ visits, onVisitsChanged }: { visits: ScheduledVis
           </div>
         </section>;
       })()}
+      {timePopup && <div className="visit-time-popup-backdrop" role="presentation" onMouseDown={() => setTimePopup(null)}><section className="visit-time-popup" role="alertdialog" aria-modal="true" aria-labelledby="visit-time-popup-title" onMouseDown={(event) => event.stopPropagation()}><span aria-hidden="true">◷</span><h2 id="visit-time-popup-title">Please check the time</h2><p>{timePopup}</p><small>Open the NOC / POC comments tab to review the authorized hours for each date.</small><button className="primary-button" onClick={() => setTimePopup(null)} type="button">Close</button></section></div>}
     </div>
   );
 }
@@ -2198,13 +2243,24 @@ function CreateVisitDialog({ organizations, zones, onClose, onSaved }: { organiz
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [hasDelivery, setHasDelivery] = useState(false);
-  const [defaultStart] = useState(() => {
+  const [visitStart, setVisitStart] = useState(() => {
     const date = new Date(Date.now() + 60 * 60 * 1000);
     const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
     return localDate.toISOString().slice(0, 16);
   });
+  const [durationHours, setDurationHours] = useState("4");
+  const [allowedHours, setAllowedHours] = useState<Record<string, number[]>>({});
+  const requiredVisitDates = useMemo(() => visitDateKeys(visitStart, Number(durationHours)), [visitStart, durationHours]);
+  const hoursComplete = requiredVisitDates.length > 0 && requiredVisitDates.every((date) => (allowedHours[date]?.length ?? 0) > 0);
   const requesters = organizations.filter((organization) => organization.status === "ACTIVE" && ["DATA_CENTER_OPERATOR", "COLOCATION_CUSTOMER"].includes(organization.type));
   const cages = zones.filter((zone) => zone.type === "CAGE" && zone.status === "ONLINE");
+
+  function toggleAllowedHour(date: string, hour: number) {
+    setAllowedHours((current) => {
+      const selected = current[date] ?? [];
+      return { ...current, [date]: selected.includes(hour) ? selected.filter((item) => item !== hour) : [...selected, hour].sort((a, b) => a - b) };
+    });
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2212,10 +2268,11 @@ function CreateVisitDialog({ organizations, zones, onClose, onSaved }: { organiz
     setError("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
     try {
+      const validFrom = new Date(String(values.validFrom)).toISOString();
       const response = await fetch("/api/visits", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...values, hasDelivery }),
+        body: JSON.stringify({ ...values, validFrom, hasDelivery, allowedHours }),
       });
       const result = (await response.json()) as { ticketNumber?: string; error?: string };
       if (!response.ok || !result.ticketNumber) throw new Error(result.error || "Visit ticket could not be created.");
@@ -2239,15 +2296,24 @@ function CreateVisitDialog({ organizations, zones, onClose, onSaved }: { organiz
           <label className="full-field"><span>Visitor phone (optional)</span><input type="tel" name="visitorPhone" maxLength={40} placeholder="+1 212 555 0100" /></label>
           <label className="full-field"><span>Customer cage</span><select name="cageZoneId" required defaultValue={cages[0]?.id}>{cages.map((cage) => <option value={cage.id} key={cage.id}>{cage.name}</option>)}</select></label>
           <label className="full-field"><span>Authorized cabinets</span><input name="cabinets" required maxLength={700} placeholder="CAB-11001, CAB-11002" /><small>Separate multiple cabinets with commas.</small></label>
-          <label><span>Visit starts</span><input type="datetime-local" name="validFrom" required defaultValue={defaultStart} /></label>
-          <label><span>Valid for</span><select name="durationHours" defaultValue="4"><option value="1">1 hour</option><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option></select></label>
+          <label><span>Visit starts</span><input type="datetime-local" name="validFrom" required value={visitStart} onChange={(event) => setVisitStart(event.target.value)} /></label>
+          <label><span>Valid for</span><select name="durationHours" value={durationHours} onChange={(event) => setDurationHours(event.target.value)}><option value="1">1 hour</option><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="12">12 hours</option><option value="24">24 hours</option><option value="48">48 hours</option><option value="72">72 hours</option><option value="168">7 days</option><option value="336">14 days</option><option value="744">31 days</option></select></label>
+          <fieldset className="full-field visit-hours-builder">
+            <legend>Authorized work hours <b>Required</b></legend>
+            <p>Select every hour the visitor may work on each date. Hours use the DC-01 24-hour clock.</p>
+            <div className="visit-hours-days">{requiredVisitDates.map((date) => <section className="visit-hours-day" key={date}>
+              <header><strong>{date}</strong><span>{allowedHours[date]?.length ?? 0} hours selected</span><button type="button" onClick={() => setAllowedHours((current) => ({ ...current, [date]: HOURS_24 }))}>Select all</button><button type="button" onClick={() => setAllowedHours((current) => ({ ...current, [date]: [] }))}>Clear</button></header>
+              <div className="hour-checkbox-grid">{HOURS_24.map((hour) => <label key={hour}><input type="checkbox" checked={allowedHours[date]?.includes(hour) ?? false} onChange={() => toggleAllowedHour(date, hour)} /><span>{String(hour).padStart(2, "0")}</span></label>)}</div>
+            </section>)}</div>
+            {!hoursComplete && <small className="visit-hours-required">Choose at least one hour for every listed date before creating the ticket.</small>}
+          </fieldset>
           <label className="full-field"><span>Comments (optional)</span><textarea name="comments" maxLength={1000} rows={3} placeholder="Escort instructions, work scope, contacts, or restrictions…" /></label>
           <label className="full-field visit-delivery-toggle"><input type="checkbox" checked={hasDelivery} onChange={(event) => setHasDelivery(event.target.checked)} /><span><strong>Package delivery included</strong><small>Capture package count and delivery notes for receiving.</small></span></label>
           {hasDelivery && <><label><span>Number of packages</span><input type="number" name="packageCount" required min="1" max="999" defaultValue="1" /></label><label><span>Package details</span><input name="packageDetails" maxLength={500} placeholder="e.g. Two sealed server cartons" /></label></>}
         </div>
-        <div className="info-callout"><span>i</span><p>The ticket becomes active only during its approved window and grants access only to the selected cage and listed cabinets.</p></div>
+        <div className="info-callout"><span>i</span><p>The ticket can start only on a listed date and during one of its explicitly selected hours. Access remains limited to the selected cage and cabinets.</p></div>
         {error && <p className="form-error">{error}</p>}
-        <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Cancel</button><button className="primary-button" disabled={saving || requesters.length === 0 || cages.length === 0} type="submit">{saving ? "Creating…" : "Create ticket"}</button></div>
+        <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">Cancel</button><button className="primary-button" disabled={saving || !hoursComplete || requesters.length === 0 || cages.length === 0} type="submit">{saving ? "Creating…" : "Create ticket"}</button></div>
       </form>
     </div>
   );
