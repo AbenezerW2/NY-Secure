@@ -1744,6 +1744,8 @@ select:focus-visible {
 
 /* Simplified activity */
 .visits-workspace { display: grid; gap: 14px; }
+.visit-workspace-tabs { margin-bottom: 0; }
+.visit-ticket-tab { font-family: var(--font-geist-mono), monospace; }
 .visit-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .visit-summary-card { position: relative; display: grid; gap: 4px; padding: 16px 18px; overflow: hidden; }
 .visit-summary-card::after { position: absolute; inset: 0 auto 0 0; width: 3px; content: ""; background: var(--blue); }
@@ -1771,6 +1773,10 @@ select:focus-visible {
 .visits-table td > strong,
 .visits-table td > small { display: block; }
 .visits-table td > small { margin-top: 4px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; }
+.visits-table tbody tr { cursor: pointer; }
+.ticket-number-link { padding: 0; color: #2768c8; background: transparent; border: 0; cursor: pointer; font-family: var(--font-geist-mono), monospace; font-size: inherit; font-weight: 800; text-align: left; }
+.ticket-number-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ticket-number-link:focus-visible { outline: 3px solid rgba(45, 112, 223, .22); outline-offset: 2px; border-radius: 3px; }
 .ticket-number { color: #245fae; font-family: var(--font-geist-mono), monospace; letter-spacing: .03em; }
 .cabinet-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .cabinet-tags span { padding: 3px 5px; color: #45656a; background: #eef3f2; border-radius: 4px; font-family: var(--font-geist-mono), monospace; font-size: calc(6px * var(--font-scale)); }
@@ -1785,6 +1791,43 @@ select:focus-visible {
 .overdue-visit td:first-child { box-shadow: inset 3px 0 #d83d3d, inset 0 2px #d83d3d, inset 0 -2px #d83d3d; }
 .overdue-visit td:last-child { box-shadow: inset -3px 0 #d83d3d, inset 0 2px #d83d3d, inset 0 -2px #d83d3d; }
 .no-delivery { color: var(--soft-muted); font-size: calc(8px * var(--font-scale)); }
+.visit-ticket-detail { overflow: hidden; }
+.visit-ticket-detail.overdue { box-shadow: inset 0 0 0 2px #d83d3d; }
+.visit-ticket-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 25px; border-bottom: 1px solid var(--line); }
+.visit-ticket-detail-header h2 { margin: 4px 0 0; color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: calc(20px * var(--font-scale)); }
+.visit-ticket-detail-header p:last-child { margin: 6px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
+.visit-ticket-error { padding: 10px 25px; color: var(--red); background: var(--red-soft); border-bottom: 1px solid #edcccc; font-size: calc(8px * var(--font-scale)); }
+.visit-ticket-detail-layout { display: grid; min-height: 560px; grid-template-columns: minmax(0, 1fr) 330px; }
+.visit-ticket-information { min-width: 0; padding: 27px; }
+.visit-ticket-section-heading h3 { margin: 4px 0 0; color: var(--ink); font-size: calc(18px * var(--font-scale)); }
+.visit-ticket-section-heading p:last-child { margin: 6px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
+.visit-ticket-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin: 23px 0 0; }
+.visit-ticket-facts > div { min-width: 0; padding: 14px 15px; background: #f8fafb; border: 1px solid var(--line); border-radius: 9px; }
+.visit-ticket-facts > div.wide { grid-column: 1 / -1; }
+.visit-ticket-facts dt, .visit-ticket-identity dt { margin-bottom: 6px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+.visit-ticket-facts dd, .visit-ticket-identity dd { margin: 0; color: var(--ink); font-size: calc(9px * var(--font-scale)); font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
+.visit-ticket-facts dd > strong, .visit-ticket-facts dd > small { display: block; }
+.visit-ticket-facts dd > small { margin-top: 4px; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); font-weight: 500; }
+.visit-ticket-facts code { color: #2768c8; font-family: var(--font-geist-mono), monospace; }
+.visit-ticket-facts .cabinet-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.visit-ticket-identity { padding: 28px 24px; background: #f5f8fc; border-left: 1px solid var(--line); }
+.visit-photo-frame { display: grid; justify-items: start; gap: 8px; margin-bottom: 22px; }
+.visit-photo-frame .blank-contact-photo { width: 92px; height: 92px; margin: 0; }
+.visit-photo-frame em { color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-style: normal; font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
+.visit-ticket-identity h3 { margin: 4px 0 0; color: var(--ink); font-size: calc(19px * var(--font-scale)); letter-spacing: -.025em; }
+.visit-ticket-identity dl { display: grid; margin: 22px 0 0; }
+.visit-ticket-identity dl > div { padding: 12px 0; border-top: 1px solid var(--line); }
+.visit-ticket-identity a { color: #2768c8; }
+.visit-photo-verification { display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; padding: 12px; background: #fff; border: 1px solid #cbd9e3; border-radius: 9px; cursor: pointer; }
+.visit-photo-verification input { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px; accent-color: var(--blue); }
+.visit-photo-verification span, .visit-photo-verification strong, .visit-photo-verification small { display: block; }
+.visit-photo-verification strong { color: var(--ink); font-size: calc(8px * var(--font-scale)); }
+.visit-photo-verification small { margin-top: 4px; color: var(--muted); font-size: calc(7px * var(--font-scale)); line-height: 1.4; }
+.start-visit-button { width: 100%; margin-top: 12px; }
+.start-visit-button:disabled { cursor: not-allowed; opacity: .55; }
+.visit-ticket-active-note, .visit-ticket-timing-note { margin: 12px 0 0; color: var(--muted); font-size: calc(7px * var(--font-scale)); line-height: 1.5; }
+.visit-ticket-active-note { color: #167b5b; }
+.visit-ticket-active-note span { margin-right: 5px; }
 .locator-layout, .locator-results { display: grid; gap: 16px; }
 .locator-search-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
 .locator-directory .locator-mode-note { margin: 14px 26px 20px; }
@@ -1905,6 +1948,8 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .locator-mode-note > span { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .overdue-visit td { background: #351b24; }
 .app-shell[data-theme="dark"] .visits-table th > input { background: #0c1728; border-color: var(--line); }
+.app-shell[data-theme="dark"] :is(.visit-ticket-facts > div, .visit-ticket-identity, .visit-photo-verification) { background: #132238; border-color: var(--line); }
+.app-shell[data-theme="dark"] .visit-ticket-facts code, .app-shell[data-theme="dark"] .visit-ticket-identity a { color: #a9c8ff; }
 
 @media (max-width: 1450px) {
   .facility-layout { grid-template-columns: minmax(210px, 250px) minmax(0, 1fr); }
@@ -1963,6 +2008,12 @@ select:focus-visible {
   .visits-table td:nth-child(5)::before { content: "Valid window"; }
   .visits-table td:nth-child(6)::before { content: "Delivery"; }
   .visits-table td:nth-child(7)::before { content: "Status"; }
+  .visit-ticket-detail-header { align-items: flex-start; padding: 19px 17px; }
+  .visit-ticket-detail-layout { min-height: 0; grid-template-columns: 1fr; }
+  .visit-ticket-information { padding: 22px 17px; }
+  .visit-ticket-facts { grid-template-columns: 1fr; }
+  .visit-ticket-facts > div.wide { grid-column: 1; }
+  .visit-ticket-identity { padding: 24px 18px; border-top: 1px solid var(--line); border-left: 0; }
   .activity-table.simplified { min-width: 0; }
   .activity-table.simplified thead { display: none; }
   .activity-table.simplified,

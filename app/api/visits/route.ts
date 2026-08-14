@@ -137,3 +137,66 @@ export async function POST(request: Request) {
     return apiErrorResponse(error);
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const payload = await readJsonObject(request);
+    const ticketNumber = requiredString(payload, "ticketNumber", "Work visit number", 30);
+    const action = requiredString(payload, "action", "Action", 20).toUpperCase();
+    if (action !== "START") {
+      throw new ApiError(400, "INVALID_VISIT_ACTION", "Action must be START.");
+    }
+    if (payload.photoVerified !== true) {
+      throw new ApiError(400, "PHOTO_VERIFICATION_REQUIRED", "Security must verify the visitor photo before starting the ticket.");
+    }
+
+    const db = await ensureDatabase();
+    const visit = await db
+      .prepare(
+        `SELECT ticket_number AS ticketNumber, status, valid_from AS validFrom,
+          valid_until AS validUntil, signed_in_at AS signedInAt,
+          signed_out_at AS signedOutAt
+         FROM scheduled_visits WHERE ticket_number = ?`,
+      )
+      .bind(ticketNumber)
+      .first<{ ticketNumber: string; status: string; validFrom: string; validUntil: string; signedInAt: string | null; signedOutAt: string | null }>();
+
+    if (!visit) {
+      throw new ApiError(404, "VISIT_NOT_FOUND", "The work visit ticket was not found.");
+    }
+    if (visit.status === "CANCELLED") {
+      throw new ApiError(409, "VISIT_CANCELLED", "A cancelled work visit cannot be started.");
+    }
+    if (visit.signedOutAt) {
+      throw new ApiError(409, "VISIT_COMPLETED", "This work visit has already been completed.");
+    }
+    if (visit.signedInAt) {
+      return Response.json({ ticketNumber, status: "ACTIVE", signedInAt: visit.signedInAt, alreadyStarted: true });
+    }
+
+    const now = new Date();
+    if (now.getTime() < new Date(visit.validFrom).getTime()) {
+      throw new ApiError(409, "VISIT_NOT_STARTED", "The approved work-visit window has not started yet.");
+    }
+    if (now.getTime() > new Date(visit.validUntil).getTime()) {
+      throw new ApiError(409, "VISIT_EXPIRED", "The work-visit ticket has expired.");
+    }
+
+    const signedInAt = now.toISOString();
+    const result = await db
+      .prepare(
+        `UPDATE scheduled_visits
+         SET signed_in_at = ?, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+         WHERE ticket_number = ? AND signed_in_at IS NULL AND signed_out_at IS NULL`,
+      )
+      .bind(signedInAt, ticketNumber)
+      .run() as { meta: { changes?: number } };
+    if (Number(result.meta.changes ?? 0) === 0) {
+      throw new ApiError(409, "VISIT_STATE_CHANGED", "The work visit changed before it could be started. Refresh and try again.");
+    }
+
+    return Response.json({ ticketNumber, status: "ACTIVE", signedInAt });
+  } catch (error) {
+    return apiErrorResponse(error);
+  }
+}

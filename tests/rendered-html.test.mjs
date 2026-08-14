@@ -3,11 +3,12 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("defines the NY-Secure access-control product experience", async () => {
-  const [layout, consoleSource, initSource, styles] = await Promise.all([
+  const [layout, consoleSource, initSource, styles, visitsRoute] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/ny-secure-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../db/init.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/visits/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /title:\s*"NY-Secure Physical Security"/);
   assert.match(consoleSource, /Simulation environment/);
@@ -54,6 +55,16 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Filter Valid window column/);
   assert.match(consoleSource, /Filter Delivery column/);
   assert.match(consoleSource, /Filter Status column/);
+  assert.match(consoleSource, /Open scheduled visit tabs/);
+  assert.match(consoleSource, /Double-click to open this work visit/);
+  assert.match(consoleSource, /Point of contact/);
+  assert.match(consoleSource, /Work visit number/);
+  assert.match(consoleSource, /Photo verified/);
+  assert.match(consoleSource, /Verify photo & start ticket/);
+  assert.match(consoleSource, /method: "PATCH"/);
+  assert.match(visitsRoute, /export async function PATCH/);
+  assert.match(visitsRoute, /PHOTO_VERIFICATION_REQUIRED/);
+  assert.match(visitsRoute, /SET signed_in_at = \?, status = 'ACTIVE'/);
   assert.match(consoleSource, /Signed in · overdue/);
   assert.match(consoleSource, /effectiveVisitStatus/);
   assert.match(consoleSource, /setInterval\(\(\) => setVisitClock\(Date\.now\(\)\), 1000\)/);
