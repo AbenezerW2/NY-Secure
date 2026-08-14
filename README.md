@@ -21,7 +21,7 @@ The console uses a two-level navigation model. The bottom taskbar switches betwe
 
 ### Customer data
 
-- **People** — separates directory search, search results, open profiles, people currently on site, pending security verification, and sign-in history.
+- **People** — separates directory search, search results, open profiles, a searchable contact-card roster for people currently on site, pending security verification, and sign-in history.
 - **Organizations** — displays customers, the data-center operator, network providers, contacts, people, and assigned cage inventory.
 - **Scheduled visits** — creates and tracks temporary customer- or NOC-sponsored work-visit tickets with visitor, access, timing, cabinet, comment, and delivery details.
 

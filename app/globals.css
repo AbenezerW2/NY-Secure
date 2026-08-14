@@ -1002,25 +1002,29 @@ select:focus-visible {
 .presence-total.history { color: #4c5f91; background: #eef1fa; border-color: #dce2f2; }
 .presence-total strong { font-size: calc(19px * var(--font-scale)); line-height: 1; }
 .presence-total small { font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
-.presence-card-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 14px; padding: 20px; }
-.presence-card { overflow: hidden; background: #fff; border: 1px solid #dce5e8; border-radius: 11px; box-shadow: 0 4px 13px rgba(26, 58, 74, .05); }
-.presence-card-person { display: flex; align-items: center; gap: 11px; padding: 14px 15px; border-bottom: 1px solid #e8edef; }
-.presence-card-person > div { min-width: 0; flex: 1; }
-.presence-card-person strong, .presence-card-person small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.presence-card-person strong { color: var(--ink); font-size: calc(10px * var(--font-scale)); }
-.presence-card-person small { margin-top: 3px; color: var(--muted); font-size: calc(7px * var(--font-scale)); }
 .presence-status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border-radius: 999px; font-size: calc(6px * var(--font-scale)); font-weight: 760; }
 .presence-status.onsite { color: #167b5b; background: #e7f5ef; }
 .presence-status i { width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 3px rgba(22, 123, 91, .1); }
-.presence-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 6px 15px; }
-.presence-card dl > div { min-width: 0; padding: 10px 0; border-bottom: 1px solid #edf1f2; }
-.presence-card dl > div:nth-last-child(-n + 2) { border-bottom: 0; }
-.presence-card dt { margin-bottom: 4px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 730; letter-spacing: .06em; text-transform: uppercase; }
-.presence-card dd { margin: 0; color: #415961; font-size: calc(8px * var(--font-scale)); font-weight: 650; overflow-wrap: anywhere; }
-.presence-card dd small { display: block; margin-top: 3px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 500; }
-.presence-card code { font-family: var(--font-geist-mono), monospace; }
-.presence-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 15px; color: var(--soft-muted); background: #f8fafb; border-top: 1px solid #e8edef; font-size: calc(6px * var(--font-scale)); }
-.presence-card footer .secondary-button { min-height: 31px; }
+.onsite-directory-toolbar { display: flex; align-items: center; gap: 14px; padding: 13px 25px; background: #f8fafb; border-bottom: 1px solid var(--line); }
+.onsite-directory-toolbar .table-search { width: min(520px, 100%); }
+.onsite-directory-toolbar .result-count { margin-left: auto; }
+.onsite-contact-grid { align-items: start; }
+.onsite-contact-card { cursor: default; }
+.contact-card-type.onsite { color: #167b5b; background: #ebf7f2; }
+.contact-card-type.onsite i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 3px rgba(22, 123, 91, .1); }
+.onsite-contact-main { width: 100%; color: inherit; background: transparent; border: 0; cursor: pointer; text-align: left; }
+.onsite-contact-main:disabled { cursor: default; }
+.onsite-contact-main:focus-visible { outline: 3px solid rgba(45, 112, 223, .24); outline-offset: -3px; }
+.onsite-card-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-top: 1px solid #e5ebef; }
+.onsite-card-meta > div { min-width: 0; padding: 10px 13px; border-bottom: 1px solid #edf1f3; }
+.onsite-card-meta > div:nth-child(odd) { border-right: 1px solid #edf1f3; }
+.onsite-card-meta dt { margin-bottom: 4px; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 760; letter-spacing: .07em; text-transform: uppercase; }
+.onsite-card-meta dd { margin: 0; overflow: hidden; color: var(--ink); font-size: calc(7px * var(--font-scale)); font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.onsite-card-meta dd small { display: block; margin-top: 3px; overflow: hidden; color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.onsite-card-meta code { font-family: var(--font-geist-mono), monospace; }
+.onsite-contact-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; color: var(--soft-muted); background: #f8fafb; font-size: calc(6px * var(--font-scale)); }
+.onsite-contact-footer .secondary-button { min-height: 31px; flex: 0 0 auto; }
+.onsite-search-empty { min-height: 260px; }
 .presence-empty { display: grid; min-height: 330px; place-items: center; align-content: center; gap: 7px; color: var(--soft-muted); text-align: center; }
 .presence-empty > span { font-size: calc(30px * var(--font-scale)); }
 .presence-empty h3 { margin: 4px 0 0; color: var(--ink); font-size: calc(13px * var(--font-scale)); }
@@ -1865,8 +1869,7 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .people-workspace-tabs { border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button, .people-tab-shell) { color: #8fa2b9; background: #132238; border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.people-workspace-tabs > button.active, .people-tab-shell.active) { color: #a9c8ff; background: var(--surface); }
-.app-shell[data-theme="dark"] :is(.presence-card, .presence-card footer) { background: #132238; border-color: var(--line); }
-.app-shell[data-theme="dark"] :is(.presence-card dd, .pending-credential code) { color: var(--ink); }
+.app-shell[data-theme="dark"] .pending-credential code { color: var(--ink); }
 .app-shell[data-theme="dark"] .presence-total { color: #8ed6bd; background: #11362e; border-color: #225a4c; }
 .app-shell[data-theme="dark"] .presence-total.pending { color: #f2c078; background: #3b2b15; border-color: #6a4b20; }
 .app-shell[data-theme="dark"] .presence-total.history { color: #b7c7f5; background: #202d51; border-color: #35466f; }
@@ -1878,6 +1881,9 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .contact-card-type { border-color: var(--line); }
 .app-shell[data-theme="dark"] .contact-card-type.customer { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .contact-card-type.internal { color: #8ed6bd; background: #11362e; }
+.app-shell[data-theme="dark"] .contact-card-type.onsite { color: #8ed6bd; background: #11362e; }
+.app-shell[data-theme="dark"] :is(.onsite-directory-toolbar, .onsite-contact-footer) { background: #0c1728; border-color: var(--line); }
+.app-shell[data-theme="dark"] .onsite-card-meta, .app-shell[data-theme="dark"] .onsite-card-meta > div { border-color: var(--line); }
 .app-shell[data-theme="dark"] .data-table tbody tr:focus-within { background: #1a2d48; }
 .app-shell[data-theme="dark"] .tree-branch button:hover,
 .app-shell[data-theme="dark"] .tree-branch button.active { color: #a9c8ff; background: #17345f; }
@@ -2013,7 +2019,8 @@ select:focus-visible {
   .profile-tab-content { padding: 22px 18px 28px; }
   .profile-contact dl { grid-template-columns: 1fr; }
   .presence-header { align-items: flex-start; padding: 19px 17px; }
-  .presence-card-grid { grid-template-columns: 1fr; padding: 14px; }
+  .onsite-directory-toolbar { align-items: stretch; flex-direction: column; padding: 12px 17px; }
+  .onsite-directory-toolbar .result-count { margin-left: 0; }
   .pending-checkin-list article { grid-template-columns: 1fr 1fr; gap: 13px; padding: 15px 17px; }
   .pending-person, .pending-actions { grid-column: 1 / -1; }
   .pending-actions { justify-content: stretch; }
