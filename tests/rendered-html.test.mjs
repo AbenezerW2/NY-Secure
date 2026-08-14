@@ -37,6 +37,11 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /commandEvents/);
   assert.match(consoleSource, /onCommandsChanged/);
   assert.match(initSource, /door_control_events/);
+  assert.match(initSource, /ticketNumber: "01-593204"[\s\S]*startsInMinutes: -5,[\s\S]*durationMinutes: 24 \* 60/);
+  assert.match(initSource, /danielVisitStart/);
+  assert.match(initSource, /datetime\(valid_from\) > datetime\(\?\)/);
+  assert.doesNotMatch(initSource, /valid_from = excluded\.valid_from/);
+  assert.doesNotMatch(initSource, /allowed_hours = excluded\.allowed_hours/);
   assert.match(consoleSource, /\/api\/command-center/);
   assert.match(commandRoute, /UNLOCK.*LOCK.*NORMAL.*GRANT_PERSON/);
   assert.match(commandRoute, /badge scans are bypassed/);
@@ -95,7 +100,8 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(visitsRoute, /VISIT_HOURS_REQUIRED/);
   assert.match(visitsRoute, /VISIT_TIME_NOT_ALLOWED/);
   assert.match(visitsRoute, /America\/New_York/);
-  assert.match(visitsRoute, /SET signed_in_at = \?, status = 'ACTIVE'/);
+  assert.match(visitsRoute, /SET signed_in_at = \?, updated_at = CURRENT_TIMESTAMP/);
+  assert.doesNotMatch(visitsRoute, /SET signed_in_at = \?, status = 'ACTIVE'/);
   assert.match(consoleSource, /Signed in · overdue/);
   assert.match(consoleSource, /effectiveVisitStatus/);
   assert.match(consoleSource, /setInterval\(\(\) => setVisitClock\(Date\.now\(\)\), 1000\)/);

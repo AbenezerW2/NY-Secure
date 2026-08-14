@@ -1042,8 +1042,8 @@ async function seedDatabase(db: D1Database) {
       visitorPhone: "+1 646 555 0188",
       cageZoneId: "zone-cage-22000",
       cabinets: ["CAB-22004"],
-      startsInMinutes: 24 * 60,
-      durationMinutes: 360,
+      startsInMinutes: -5,
+      durationMinutes: 24 * 60,
       comments: "Fiber inspection only. No equipment removal is authorized.",
       hasDelivery: 0,
       packageCount: 0,
@@ -1087,10 +1087,7 @@ async function seedDatabase(db: D1Database) {
              visitor_phone = excluded.visitor_phone,
              cage_zone_id = excluded.cage_zone_id,
              cabinet_access = excluded.cabinet_access,
-             valid_from = excluded.valid_from,
-             valid_until = excluded.valid_until,
              comments = excluded.comments,
-             allowed_hours = excluded.allowed_hours,
              has_delivery = excluded.has_delivery,
              package_count = excluded.package_count,
              package_details = excluded.package_details,
@@ -1115,6 +1112,23 @@ async function seedDatabase(db: D1Database) {
         );
     }),
   );
+  const danielVisitStart = new Date(now.getTime() - 5 * 60 * 1000);
+  const danielVisitEnd = new Date(danielVisitStart.getTime() + 24 * 60 * 60 * 1000);
+  await db
+    .prepare(
+      `UPDATE scheduled_visits
+       SET valid_from = ?, valid_until = ?, allowed_hours = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE ticket_number = '01-593204'
+         AND signed_in_at IS NULL AND signed_out_at IS NULL
+         AND datetime(valid_from) > datetime(?)`,
+    )
+    .bind(
+      danielVisitStart.toISOString(),
+      danielVisitEnd.toISOString(),
+      allHoursForRange(danielVisitStart, danielVisitEnd),
+      now.toISOString(),
+    )
+    .run();
   await db
     .prepare(
       `UPDATE scheduled_visits
