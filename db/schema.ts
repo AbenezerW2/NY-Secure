@@ -211,6 +211,36 @@ export const alarms = sqliteTable(
   ],
 );
 
+export const doorControls = sqliteTable(
+  "door_controls",
+  {
+    zoneId: text("zone_id").primaryKey().references(() => zones.id),
+    mode: text("mode").notNull().default("NORMAL"),
+    grantedPersonId: text("granted_person_id").references(() => people.id),
+    grantExpiresAt: text("grant_expires_at"),
+    updatedBy: text("updated_by").notNull().default("Maya Brooks"),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("idx_door_controls_mode").on(table.mode)],
+);
+
+export const doorControlEvents = sqliteTable(
+  "door_control_events",
+  {
+    id: text("id").primaryKey(),
+    zoneId: text("zone_id").notNull().references(() => zones.id),
+    personId: text("person_id").references(() => people.id),
+    action: text("action").notNull(),
+    detail: text("detail").notNull().default(""),
+    operatorName: text("operator_name").notNull().default("Maya Brooks"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_door_control_events_created_at").on(table.createdAt),
+    index("idx_door_control_events_zone_created_at").on(table.zoneId, table.createdAt),
+  ],
+);
+
 export const scheduledVisits = sqliteTable(
   "scheduled_visits",
   {

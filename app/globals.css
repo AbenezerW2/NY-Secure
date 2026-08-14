@@ -1892,6 +1892,73 @@ select:focus-visible {
 .locator-summary-footer { display: flex; justify-content: flex-end; gap: 16px; padding: 9px 18px; color: var(--soft-muted); background: #f8fafb; border-top: 1px solid var(--line); font-size: calc(6px * var(--font-scale)); }
 .locator-summary-footer span { white-space: nowrap; }
 .locator-summary-footer b { margin-right: 3px; color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: calc(7px * var(--font-scale)); }
+.command-center-layout { display: grid; gap: 18px; }
+.command-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.command-summary-grid article { position: relative; min-height: 126px; padding: 20px 22px; overflow: hidden; }
+.command-summary-grid article::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: #4a89ea; content: ""; }
+.command-summary-grid article.unlocked::before { background: #17a775; }
+.command-summary-grid article.locked::before { background: #dc4b55; }
+.command-summary-grid article.granted::before { background: #8b6fe8; }
+.command-summary-grid span, .door-control-state > span { display: block; color: var(--soft-muted); font-size: calc(8px * var(--font-scale)); font-weight: 780; letter-spacing: .08em; text-transform: uppercase; }
+.command-summary-grid strong { display: block; margin: 8px 0 3px; color: var(--ink); font-size: calc(29px * var(--font-scale)); line-height: 1; }
+.command-summary-grid small { color: var(--muted); font-size: calc(8px * var(--font-scale)); }
+.command-door-panel, .command-log-panel { overflow: hidden; }
+.command-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.command-panel-header h2 { margin: 4px 0; color: var(--ink); font-size: calc(19px * var(--font-scale)); }
+.command-panel-header p:last-child { margin: 0; color: var(--muted); font-size: calc(9px * var(--font-scale)); }
+.command-panel-header > span { display: inline-flex; align-items: center; gap: 7px; color: #268767; font-size: calc(8px * var(--font-scale)); font-weight: 750; white-space: nowrap; }
+.command-panel-header > span i { width: 7px; height: 7px; border-radius: 50%; background: #2bbe8a; box-shadow: 0 0 0 5px rgb(43 190 138 / 12%); }
+.command-toolbar { grid-template-columns: minmax(280px, 1fr) minmax(180px, 230px) auto; }
+.command-toolbar > select { min-height: 38px; padding: 0 34px 0 12px; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.command-error { margin: 16px 20px 0; padding: 11px 13px; color: #9b2631; border: 1px solid #f2aab0; border-radius: 9px; background: #fff1f2; font-size: calc(9px * var(--font-scale)); font-weight: 680; }
+.command-loading { padding: 44px; color: var(--muted); text-align: center; }
+.command-door-grid { display: grid; grid-template-columns: repeat(3, minmax(290px, 1fr)); gap: 14px; padding: 18px; background: var(--canvas); }
+.command-door-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-top: 3px solid #8395aa; border-radius: 13px; background: var(--panel); box-shadow: 0 5px 18px rgb(27 48 72 / 5%); }
+.command-door-card.unlocked { border-top-color: #20a975; }
+.command-door-card.locked { border-top-color: #d84651; }
+.command-door-card > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 17px; border-bottom: 1px solid var(--line); }
+.command-door-card > header strong, .command-event-list article strong { display: block; color: var(--ink); font-size: calc(10px * var(--font-scale)); }
+.command-door-card > header small { display: block; margin-top: 3px; color: var(--muted); font-size: calc(7px * var(--font-scale)); overflow-wrap: anywhere; }
+.door-control-icon { position: relative; width: 31px; height: 35px; border: 2px solid #8497aa; border-radius: 5px 9px 9px 5px; background: #edf3f7; }
+.door-control-icon span { position: absolute; inset: 4px 5px 4px 7px; border: 1px solid #9cadaf; border-radius: 2px 5px 5px 2px; background: var(--panel); }
+.door-control-icon i { position: absolute; top: 16px; right: 8px; width: 4px; height: 4px; border-radius: 50%; background: #62788d; }
+.door-mode { padding: 5px 7px; color: #5f7488; border-radius: 6px; background: #edf2f6; font-size: calc(6px * var(--font-scale)); font-weight: 770; white-space: nowrap; }
+.door-mode.unlocked { color: #08724d; background: #dff7ed; }
+.door-mode.locked { color: #9d2d37; background: #ffe6e8; }
+.door-control-state { min-height: 97px; padding: 15px 17px; }
+.door-control-state > p { min-height: 32px; margin: 7px 0 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); line-height: 1.5; }
+.door-person-grant { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-top: 10px; padding: 9px 10px; border: 1px solid #d8cef8; border-radius: 8px; background: #f4f0ff; }
+.door-person-grant b { grid-row: 1 / 3; align-self: center; padding: 4px 6px; color: #5e48ad; border-radius: 5px; background: #e4dcff; font-size: calc(6px * var(--font-scale)); text-transform: uppercase; }
+.door-person-grant strong { color: var(--ink); font-size: calc(8px * var(--font-scale)); }
+.door-person-grant small { color: var(--muted); font-size: calc(6px * var(--font-scale)); }
+.door-command-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 0 17px 15px; }
+.door-command-actions button, .door-person-access button { min-height: 34px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; font-size: calc(7px * var(--font-scale)); font-weight: 750; cursor: pointer; }
+.door-command-actions button:disabled, .door-person-access button:disabled { opacity: .45; cursor: not-allowed; }
+.unlock-command { color: #08734e; border-color: #a8dfcc !important; background: #e8f8f2; }
+.lock-command { color: #a02c37; border-color: #efb3b8 !important; background: #fff0f1; }
+.normal-command { color: #4c6174; background: #f1f4f7; }
+.door-person-access { display: grid; grid-template-columns: minmax(130px, 1.35fr) minmax(118px, 1fr) 88px auto; align-items: center; gap: 7px; padding: 13px 17px; border-top: 1px solid var(--line); background: var(--subtle); }
+.door-person-access p { margin: 0; }
+.door-person-access p strong, .door-person-access p small { display: block; }
+.door-person-access p strong { color: var(--ink); font-size: calc(8px * var(--font-scale)); }
+.door-person-access p small { margin-top: 2px; color: var(--muted); font-size: calc(6px * var(--font-scale)); line-height: 1.35; }
+.door-person-access select { min-width: 0; height: 34px; padding: 0 25px 0 8px; color: var(--ink); border: 1px solid var(--line); border-radius: 7px; background: var(--panel); font-size: calc(7px * var(--font-scale)); }
+.door-person-access button { color: #fff; border-color: #4b83dc; background: #4b83dc; }
+.command-door-card > footer { display: flex; justify-content: space-between; gap: 10px; padding: 9px 17px; color: var(--soft-muted); border-top: 1px solid var(--line); font-size: calc(6px * var(--font-scale)); }
+.command-event-list article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 13px 22px; border-bottom: 1px solid var(--line); }
+.command-event-list article:last-child { border-bottom: 0; }
+.command-event-list article p { margin: 3px 0; color: var(--muted); font-size: calc(8px * var(--font-scale)); }
+.command-event-list article small { display: block; color: var(--soft-muted); font-size: calc(7px * var(--font-scale)); }
+.command-event-list article > time { text-align: right; }
+.command-event-mark { display: grid; width: 31px; height: 31px; place-items: center; color: #557085; border-radius: 8px; background: #edf2f6; font-weight: 800; }
+.command-event-mark.unlock { color: #08724d; background: #dff7ed; }
+.command-event-mark.lock { color: #9d2d37; background: #ffe6e8; }
+.command-event-mark.grant_person { color: #5e48ad; background: #ebe5ff; }
+.command-empty { grid-column: 1 / -1; display: grid; min-height: 180px; place-items: center; align-content: center; gap: 5px; color: var(--muted); text-align: center; }
+.command-empty > span { font-size: calc(24px * var(--font-scale)); }
+.command-empty strong { color: var(--ink); }
+.command-empty p { margin: 0; font-size: calc(8px * var(--font-scale)); }
+.command-empty.compact { min-height: 130px; }
 .activity-toolbar .table-search { flex: 1; width: auto; max-width: 430px; }
 .alarms-toolbar .toolbar-filters { display: flex; flex: 1 1 auto; overflow-x: auto; }
 .toolbar-filters select { min-height: 35px; max-width: 190px; padding: 0 28px 0 10px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font-size: calc(8px * var(--font-scale)); }
@@ -1982,6 +2049,17 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .locator-mode-note { background: #142b48; border-color: var(--line); }
 .app-shell[data-theme="dark"] .locator-mode-note > span { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .locator-summary-footer { background: #0c1728; }
+.app-shell[data-theme="dark"] :is(.command-door-grid, .door-person-access) { background: #0c1728; }
+.app-shell[data-theme="dark"] :is(.command-door-card, .command-toolbar > select, .door-person-access select, .door-control-icon span) { color: var(--ink); background: var(--surface); border-color: var(--line); }
+.app-shell[data-theme="dark"] .door-control-icon { background: #1a2c43; border-color: #71859a; }
+.app-shell[data-theme="dark"] .door-mode { color: #a8b7c7; background: #1a2c43; }
+.app-shell[data-theme="dark"] .door-mode.unlocked { color: #70dbb5; background: #12382f; }
+.app-shell[data-theme="dark"] .door-mode.locked { color: #ff9ba4; background: #421e27; }
+.app-shell[data-theme="dark"] .door-person-grant { background: #281f47; border-color: #544686; }
+.app-shell[data-theme="dark"] .normal-command { color: #bdc9d5; background: #1a2c43; }
+.app-shell[data-theme="dark"] .unlock-command { color: #71dfb7; background: #12382f; border-color: #347d68 !important; }
+.app-shell[data-theme="dark"] .lock-command { color: #ff9ba4; background: #421e27; border-color: #85434c !important; }
+.app-shell[data-theme="dark"] .command-error { color: #ffadb4; background: #421e27; border-color: #85434c; }
 .app-shell[data-theme="dark"] .overdue-visit td { background: #351b24; }
 .app-shell[data-theme="dark"] .visits-table th > input { background: #0c1728; border-color: var(--line); }
 .app-shell[data-theme="dark"] :is(.visit-ticket-facts > div, .visit-ticket-identity, .visit-photo-verification, .visit-comment-card, .visit-hours-day, .visit-hours-builder) { background: #132238; border-color: var(--line); }
@@ -1989,6 +2067,7 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .visit-ticket-facts code, .app-shell[data-theme="dark"] .visit-ticket-identity a { color: #a9c8ff; }
 
 @media (max-width: 1450px) {
+  .command-door-grid { grid-template-columns: repeat(2, minmax(290px, 1fr)); }
   .facility-layout { grid-template-columns: minmax(210px, 250px) minmax(0, 1fr); }
   .zone-inspector { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; }
   .zone-inspector .eyebrow,
@@ -2000,6 +2079,8 @@ select:focus-visible {
 }
 
 @media (max-width: 1120px) {
+  .command-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .command-door-grid { grid-template-columns: 1fr; }
   .overview-grid { grid-template-columns: 1fr; }
   .facility-layout { grid-template-columns: 1fr; }
   .facility-tree { max-height: 330px; }
@@ -2017,6 +2098,21 @@ select:focus-visible {
 }
 
 @media (max-width: 760px) {
+  .command-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .command-summary-grid article { min-height: 104px; padding: 15px; }
+  .command-summary-grid strong { font-size: calc(23px * var(--font-scale)); }
+  .command-panel-header { align-items: flex-start; padding: 18px 17px; }
+  .command-panel-header > span { display: none; }
+  .command-toolbar { display: grid; grid-template-columns: 1fr; }
+  .command-toolbar .table-search { width: 100%; max-width: none; }
+  .command-toolbar > select { width: 100%; }
+  .command-door-grid { padding: 10px; }
+  .command-door-card > header { grid-template-columns: auto minmax(0, 1fr); }
+  .door-mode { grid-column: 2; justify-self: start; }
+  .door-command-actions { grid-template-columns: 1fr; }
+  .door-person-access { grid-template-columns: 1fr; }
+  .command-event-list article { grid-template-columns: auto minmax(0, 1fr); padding: 13px 17px; }
+  .command-event-list article > time { grid-column: 2; text-align: left; }
   .theme-toggle { width: 35px; padding: 0; justify-content: center; font-size: 0; }
   .settings-button { display: grid; }
   .page-heading { align-items: flex-start; flex-direction: column; }

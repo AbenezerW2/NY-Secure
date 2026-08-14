@@ -12,6 +12,7 @@ type View =
   | "facility"
   | "visits"
   | "locator"
+  | "command"
   | "alarms"
   | "activity";
 
@@ -226,10 +227,11 @@ const NAV_GROUPS: { label: string; symbol: string; description: string; items: {
     ],
   },
   {
-    label: "Alarm center",
+    label: "Alarm and controls",
     symbol: "AC",
-    description: "Locator, alarms, and logs",
+    description: "Door control, alarms, and logs",
     items: [
+      { id: "command", label: "Command center", symbol: "CC" },
       { id: "locator", label: "Locator", symbol: "LO" },
       { id: "alarms", label: "Alarms", symbol: "AR" },
       { id: "activity", label: "Activity log", symbol: "AL" },
@@ -295,6 +297,11 @@ const VIEW_COPY: Record<View, { eyebrow: string; title: string; subtitle: string
     eyebrow: "Last-known access point",
     title: "Locator",
     subtitle: "Find a person’s latest scan or build a 48-hour last-seen roster from the activity log.",
+  },
+  command: {
+    eyebrow: "Remote door operations",
+    title: "Command center",
+    subtitle: "Unlock, lock down, or grant person-specific access across every DC-01 door.",
   },
   alarms: {
     eyebrow: "Security exceptions",
@@ -872,7 +879,7 @@ export default function NySecureConsole() {
                   <span>＋</span> Create visit ticket
                 </button>
               )}
-              {activeView !== "people" && activeView !== "operations" && activeView !== "visits" && activeView !== "locator" && (
+              {activeView !== "people" && activeView !== "operations" && activeView !== "visits" && activeView !== "locator" && activeView !== "command" && (
                 <button className="primary-button" onClick={() => setActiveView("operations")} type="button">
                   <span className="button-reader-icon" /> Simulate access
                 </button>
@@ -943,6 +950,7 @@ export default function NySecureConsole() {
               )}
               {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} onVisitsChanged={loadState} />}
               {activeView === "locator" && <LocatorView events={data.events} people={data.people} orgMap={orgMap} />}
+              {activeView === "command" && <CommandCenterView zones={data.zones} people={data.people} />}
               {activeView === "alarms" && (
                 <AlarmsView
                   alarms={data.alarms}
@@ -1964,6 +1972,126 @@ function LocatorView({ events, people, orgMap }: { events: AccessEvent[]; people
       </section>
     </div>
   );
+}
+
+type DoorControl = {
+  zoneId: string;
+  zoneCode: string;
+  zoneName: string;
+  category: string;
+  location: string;
+  securityTier: number;
+  mode: "NORMAL" | "UNLOCKED" | "LOCKED";
+  grantedPersonId?: string | null;
+  grantedPersonName?: string | null;
+  grantExpiresAt?: string | null;
+  updatedBy: string;
+  updatedAt: string;
+};
+
+type DoorControlEvent = {
+  id: string;
+  zoneId: string;
+  zoneName: string;
+  personId?: string | null;
+  personName?: string | null;
+  action: "UNLOCK" | "LOCK" | "NORMAL" | "GRANT_PERSON";
+  detail: string;
+  operatorName: string;
+  createdAt: string;
+};
+
+function CommandCenterView({ zones, people }: { zones: Zone[]; people: Person[] }) {
+  const [doors, setDoors] = useState<DoorControl[]>([]);
+  const [events, setEvents] = useState<DoorControlEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [modeFilter, setModeFilter] = useState("ALL");
+  const [selectedPeople, setSelectedPeople] = useState<Record<string, string>>({});
+  const [durations, setDurations] = useState<Record<string, string>>({});
+  const [runningAction, setRunningAction] = useState("");
+  const activePeople = people.filter((person) => person.status === "ACTIVE").sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+
+  const loadControls = useCallback(async () => {
+    setError("");
+    try {
+      const response = await fetch("/api/command-center", { cache: "no-store" });
+      const result = (await response.json()) as { doors?: DoorControl[]; events?: DoorControlEvent[]; error?: string };
+      if (!response.ok) throw new Error(result.error || "Door controls could not be loaded.");
+      setDoors(result.doors ?? []);
+      setEvents(result.events ?? []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Door controls could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => void loadControls(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [loadControls]);
+
+  async function runDoorAction(zoneId: string, action: "UNLOCK" | "LOCK" | "NORMAL" | "GRANT_PERSON") {
+    const actionKey = `${zoneId}-${action}`;
+    setRunningAction(actionKey);
+    setError("");
+    try {
+      const response = await fetch("/api/command-center", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          zoneId,
+          action,
+          personId: selectedPeople[zoneId] || activePeople[0]?.id,
+          durationMinutes: Number(durations[zoneId] || 60),
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The door command could not be completed.");
+      await loadControls();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "The door command could not be completed.");
+    } finally {
+      setRunningAction("");
+    }
+  }
+
+  const filteredDoors = doors.filter((door) =>
+    (modeFilter === "ALL" || door.mode === modeFilter) &&
+    wildcardMatchAny([door.zoneName, door.zoneCode, door.category, door.location, door.grantedPersonName], query),
+  );
+  const unlockedCount = doors.filter((door) => door.mode === "UNLOCKED").length;
+  const lockedCount = doors.filter((door) => door.mode === "LOCKED").length;
+  const grantCount = doors.filter((door) => Boolean(door.grantedPersonId)).length;
+
+  return <div className="command-center-layout">
+    <section className="command-summary-grid">
+      <article className="panel"><span>Available doors</span><strong>{zones.filter((zone) => zone.status === "ONLINE").length}</strong><small>DC-01 readers under control</small></article>
+      <article className="panel unlocked"><span>Remotely unlocked</span><strong>{unlockedCount}</strong><small>Badge scanning bypassed</small></article>
+      <article className="panel locked"><span>Locked down</span><strong>{lockedCount}</strong><small>All credential access denied</small></article>
+      <article className="panel granted"><span>Person grants</span><strong>{grantCount}</strong><small>Active door-specific overrides</small></article>
+    </section>
+
+    <section className="panel command-door-panel">
+      <header className="command-panel-header"><div><p className="eyebrow">All controlled entrances</p><h2>Door controls</h2><p>Remote commands override normal credential policy until badge control is restored.</p></div><span><i />Live controls</span></header>
+      <div className="directory-toolbar command-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search command center doors" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search door, code, or location…" title="Use * to match any characters" /></label><select aria-label="Filter doors by control mode" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option value="ALL">All control modes</option><option value="NORMAL">Badge control</option><option value="UNLOCKED">Remotely unlocked</option><option value="LOCKED">Locked down</option></select><span className="result-count">{filteredDoors.length} doors</span></div>
+      {error && <div className="command-error" role="alert">{error}</div>}
+      {loading ? <div className="command-loading">Loading door controls…</div> : <div className="command-door-grid">{filteredDoors.map((door) => {
+        const selectedPersonId = selectedPeople[door.zoneId] || activePeople[0]?.id || "";
+        return <article className={`command-door-card ${door.mode.toLowerCase()}`} key={door.zoneId}>
+          <header><div className="door-control-icon" aria-hidden="true"><span /><i /></div><div><strong>{door.zoneName}</strong><small>{door.zoneCode} · {label(door.category)} · Level {door.securityTier}</small></div><span className={`door-mode ${door.mode.toLowerCase()}`}>{door.mode === "NORMAL" ? "Badge control" : door.mode === "UNLOCKED" ? "Remotely unlocked" : "Locked down"}</span></header>
+          <div className="door-control-state"><span>Current behavior</span><p>{door.mode === "UNLOCKED" ? "Door is open and badge scans are bypassed." : door.mode === "LOCKED" ? "Door rejects every badge, including otherwise-valid credentials." : "Normal profile, schedule, and credential checks apply."}</p>{door.grantedPersonName && <div className="door-person-grant"><b>Person grant</b><strong>{door.grantedPersonName}</strong><small>Until {formatDate(door.grantExpiresAt)} · {formatTime(door.grantExpiresAt!)}</small></div>}</div>
+          <div className="door-command-actions"><button className="unlock-command" disabled={door.mode === "UNLOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "UNLOCK")} type="button">{runningAction === `${door.zoneId}-UNLOCK` ? "Unlocking…" : "Remote unlock"}</button><button className="lock-command" disabled={door.mode === "LOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "LOCK")} type="button">{runningAction === `${door.zoneId}-LOCK` ? "Locking…" : "Lock door"}</button><button className="normal-command" disabled={door.mode === "NORMAL" && !door.grantedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "NORMAL")} type="button">Badge control</button></div>
+          <div className="door-person-access"><p><strong>Grant person access</strong><small>Door-specific access without changing their profile.</small></p><select aria-label={`Person for ${door.zoneName}`} value={selectedPersonId} onChange={(event) => setSelectedPeople((current) => ({ ...current, [door.zoneId]: event.target.value }))}>{activePeople.map((person) => <option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.badgeId}</option>)}</select><select aria-label={`Grant duration for ${door.zoneName}`} value={durations[door.zoneId] || "60"} onChange={(event) => setDurations((current) => ({ ...current, [door.zoneId]: event.target.value }))}><option value="15">15 minutes</option><option value="60">1 hour</option><option value="480">8 hours</option></select><button disabled={door.mode === "LOCKED" || !selectedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "GRANT_PERSON")} type="button">{runningAction === `${door.zoneId}-GRANT_PERSON` ? "Granting…" : "Grant access"}</button></div>
+          <footer><span>Last changed by {door.updatedBy}</span><time>{relativeEventTime(door.updatedAt)}</time></footer>
+        </article>;
+      })}{filteredDoors.length === 0 && <div className="command-empty"><span>⌕</span><strong>No matching doors</strong><p>Try another door name, code, location, or control mode.</p></div>}</div>}
+    </section>
+
+    <section className="panel command-log-panel"><header className="command-panel-header"><div><p className="eyebrow">Operator audit trail</p><h2>Recent control commands</h2><p>Remote unlocks, lockdowns, badge-control resets, and person grants.</p></div><span>{events.length} events</span></header><div className="command-event-list">{events.map((event) => <article key={event.id}><span className={`command-event-mark ${event.action.toLowerCase()}`}>{event.action === "UNLOCK" ? "↗" : event.action === "LOCK" ? "×" : event.action === "NORMAL" ? "✓" : "+"}</span><div><strong>{event.zoneName}</strong><p>{event.detail}</p><small>{event.operatorName}{event.personName ? ` · ${event.personName}` : ""}</small></div><time><strong>{formatTime(event.createdAt)}</strong><small>{relativeEventTime(event.createdAt)}</small></time></article>)}{events.length === 0 && <div className="command-empty compact"><span>✓</span><strong>No control commands yet</strong><p>Door actions will appear here.</p></div>}</div></section>
+  </div>;
 }
 
 function AlarmsView({
