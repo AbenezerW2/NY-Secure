@@ -67,6 +67,18 @@ type EventRow = {
   attemptedAt: string;
 };
 
+type CommandEventRow = {
+  id: string;
+  personId: string | null;
+  affectedPersonName: string | null;
+  zoneId: string;
+  zoneName: string;
+  action: "UNLOCK" | "LOCK" | "NORMAL" | "GRANT_PERSON";
+  detail: string;
+  operatorName: string;
+  occurredAt: string;
+};
+
 type AlarmRow = {
   id: string;
   alarmType: string;
@@ -144,6 +156,7 @@ export async function getState(db: D1Database) {
     ruleResult,
     assignmentResult,
     eventResult,
+    commandEventResult,
     alarmResult,
     visitResult,
     checkInResult,
@@ -241,6 +254,19 @@ export async function getState(db: D1Database) {
          LIMIT 100`,
       )
       .all<EventRow>(),
+    db
+      .prepare(
+        `SELECT
+          e.id, e.person_id AS personId,
+          CASE WHEN p.id IS NULL THEN NULL ELSE p.first_name || ' ' || p.last_name END AS affectedPersonName,
+          e.zone_id AS zoneId, z.name AS zoneName, e.action, e.detail,
+          e.operator_name AS operatorName, e.created_at AS occurredAt
+         FROM door_control_events e
+         JOIN zones z ON z.id = e.zone_id
+         LEFT JOIN people p ON p.id = e.person_id
+         ORDER BY e.created_at DESC`,
+      )
+      .all<CommandEventRow>(),
     db
       .prepare(
         `SELECT
@@ -422,6 +448,7 @@ export async function getState(db: D1Database) {
     profiles,
     assignments,
     events: eventResult.results,
+    commandEvents: commandEventResult.results,
     alarms: alarmResult.results,
     scheduledVisits,
     checkIns: checkInResult.results,

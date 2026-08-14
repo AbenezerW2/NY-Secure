@@ -31,6 +31,12 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /Remote unlock/);
   assert.match(consoleSource, /Lock door/);
   assert.match(consoleSource, /Grant person access/);
+  assert.match(consoleSource, /Door commands/);
+  assert.match(consoleSource, /Affected: \{event\.affectedPersonName\}/);
+  assert.match(consoleSource, /eventKind === "CONTROL"/);
+  assert.match(consoleSource, /commandEvents/);
+  assert.match(consoleSource, /onCommandsChanged/);
+  assert.match(initSource, /door_control_events/);
   assert.match(consoleSource, /\/api\/command-center/);
   assert.match(commandRoute, /UNLOCK.*LOCK.*NORMAL.*GRANT_PERSON/);
   assert.match(commandRoute, /badge scans are bypassed/);

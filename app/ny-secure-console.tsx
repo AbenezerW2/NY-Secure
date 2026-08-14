@@ -85,6 +85,11 @@ type AccessEvent = {
   decision: "GRANTED" | "DENIED";
   reasonCode: string;
   explanation?: string;
+  eventKind?: "ACCESS" | "CONTROL";
+  actionLabel?: string;
+  operatorName?: string;
+  affectedPersonName?: string | null;
+  sourceLabel?: string;
 };
 
 type Alarm = {
@@ -178,6 +183,7 @@ type StatePayload = {
   profiles: Profile[];
   assignments: Assignment[];
   events: AccessEvent[];
+  commandEvents: AccessEvent[];
   alarms: Alarm[];
   scheduledVisits: ScheduledVisit[];
   checkIns: SiteCheckIn[];
@@ -391,6 +397,7 @@ function normalizeState(source: {
   profiles?: Array<Record<string, unknown>>;
   assignments?: Array<Record<string, unknown>>;
   events?: Array<Record<string, unknown>>;
+  commandEvents?: Array<Record<string, unknown>>;
   alarms?: Array<Record<string, unknown>>;
   scheduledVisits?: Array<Record<string, unknown>>;
   checkIns?: Array<Record<string, unknown>>;
@@ -504,6 +511,33 @@ function normalizeState(source: {
       decision: String(item.decision) === "GRANTED" ? "GRANTED" : "DENIED",
       reasonCode: String(item.reasonCode ?? "UNKNOWN"),
       explanation: item.explanation ? String(item.explanation) : undefined,
+      eventKind: "ACCESS",
+    };
+  });
+  const commandEvents: AccessEvent[] = (source.commandEvents ?? []).map((item) => {
+    const action = String(item.action ?? "NORMAL");
+    const actionLabel = action === "UNLOCK"
+      ? "Remote unlock"
+      : action === "LOCK"
+        ? "Door lockdown"
+        : action === "GRANT_PERSON"
+          ? "Person access granted"
+          : "Badge control restored";
+    return {
+      id: String(item.id),
+      occurredAt: String(item.occurredAt),
+      personId: item.personId ? String(item.personId) : "",
+      personName: String(item.operatorName ?? "Security operator"),
+      zoneId: String(item.zoneId),
+      zoneName: String(item.zoneName ?? "Unknown door"),
+      decision: action === "LOCK" ? "DENIED" : "GRANTED",
+      reasonCode: `COMMAND_${action}`,
+      explanation: String(item.detail ?? "Door control command recorded."),
+      eventKind: "CONTROL",
+      actionLabel,
+      operatorName: String(item.operatorName ?? "Security operator"),
+      affectedPersonName: item.affectedPersonName ? String(item.affectedPersonName) : null,
+      sourceLabel: "Command center",
     };
   });
   const alarms: Alarm[] = (source.alarms ?? []).map((item) => ({
@@ -569,6 +603,7 @@ function normalizeState(source: {
     profiles,
     assignments,
     events,
+    commandEvents,
     alarms,
     scheduledVisits,
     checkIns,
@@ -950,7 +985,7 @@ export default function NySecureConsole() {
               )}
               {activeView === "visits" && <ScheduledVisitsView visits={data.scheduledVisits} onVisitsChanged={loadState} />}
               {activeView === "locator" && <LocatorView events={data.events} people={data.people} orgMap={orgMap} />}
-              {activeView === "command" && <CommandCenterView zones={data.zones} people={data.people} />}
+              {activeView === "command" && <CommandCenterView zones={data.zones} people={data.people} onCommandsChanged={loadState} />}
               {activeView === "alarms" && (
                 <AlarmsView
                   alarms={data.alarms}
@@ -962,7 +997,7 @@ export default function NySecureConsole() {
                   zones={zoneMap}
                 />
               )}
-              {activeView === "activity" && <ActivityView events={data.events} />}
+              {activeView === "activity" && <ActivityView events={[...data.events, ...data.commandEvents].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))} />}
             </>
           )}
         </div>
@@ -2001,7 +2036,7 @@ type DoorControlEvent = {
   createdAt: string;
 };
 
-function CommandCenterView({ zones, people }: { zones: Zone[]; people: Person[] }) {
+function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]; people: Person[]; onCommandsChanged: () => void | Promise<void> }) {
   const [doors, setDoors] = useState<DoorControl[]>([]);
   const [events, setEvents] = useState<DoorControlEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2051,6 +2086,7 @@ function CommandCenterView({ zones, people }: { zones: Zone[]; people: Person[] 
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "The door command could not be completed.");
       await loadControls();
+      await onCommandsChanged();
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The door command could not be completed.");
     } finally {
@@ -2227,12 +2263,12 @@ function AlarmsView({
 
 function ActivityView({ events }: { events: AccessEvent[] }) {
   const [search, setSearch] = useState("");
-  const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED">("ALL");
+  const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED" | "CONTROL">("ALL");
   const [zone, setZone] = useState("ALL");
   const zones = Array.from(new Set(events.map((event) => event.zoneName || event.zoneId))).sort();
   const filteredEvents = events.filter((event) => {
-    const matchesSearch = wildcardMatchAny([event.personName, event.zoneName, event.decision, event.decision === "GRANTED" ? "Access granted" : "Access denied", event.reasonCode, label(event.reasonCode), event.explanation], search);
-    const matchesDecision = decision === "ALL" || event.decision === decision;
+    const matchesSearch = wildcardMatchAny([event.personName, event.operatorName, event.affectedPersonName, event.zoneName, event.decision, event.actionLabel, event.reasonCode, label(event.reasonCode), event.explanation], search);
+    const matchesDecision = decision === "ALL" || (decision === "CONTROL" ? event.eventKind === "CONTROL" : event.eventKind !== "CONTROL" && event.decision === decision);
     const matchesZone = zone === "ALL" || (event.zoneName || event.zoneId) === zone;
     return matchesSearch && matchesDecision && matchesZone;
   });
@@ -2241,8 +2277,8 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
     const header = ["Time", "Who", "What", "Where", "When"];
     const rows = filteredEvents.map((event) => [
       formatTime(event.occurredAt),
-      event.personName || "Unknown credential",
-      event.decision === "GRANTED" ? "Access granted" : "Access denied",
+      event.operatorName || event.personName || "Unknown credential",
+      event.eventKind === "CONTROL" ? event.actionLabel || "Door command" : event.decision === "GRANTED" ? "Access granted" : "Access denied",
       event.zoneName || event.zoneId,
       formatDate(event.occurredAt),
     ]);
@@ -2259,13 +2295,13 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
       <div className="directory-toolbar activity-toolbar">
         <label className="table-search"><span>⌕</span><input aria-label="Search activity" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search activity… Try *granted*" title="Use * to match any characters" /></label>
         <div className="toolbar-filters">
-          <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="GRANTED">Granted</option><option value="DENIED">Denied</option></select>
+          <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="CONTROL">Door commands</option><option value="GRANTED">Access granted</option><option value="DENIED">Access denied</option></select>
           <select aria-label="Filter by zone" value={zone} onChange={(event) => setZone(event.target.value)}><option value="ALL">All locations</option>{zones.map((item) => <option key={item}>{item}</option>)}</select>
         </div>
         <span className="result-count">{filteredEvents.length} events</span>
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
-      <div className="table-wrap"><table className="data-table activity-table simplified"><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Where</th><th>When</th></tr></thead><tbody>{filteredEvents.map((event) => <tr key={event.id}><td><strong className="military-time">{formatTime(event.occurredAt)}</strong></td><td><strong>{event.personName || "Unknown credential"}</strong></td><td><span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span><small>{label(event.reasonCode)}</small></td><td><strong>{event.zoneName || event.zoneId}</strong><small>Entry reader</small></td><td><strong>{formatDate(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td></tr>)}</tbody></table>{filteredEvents.length === 0 && <div className="activity-empty"><strong>No matching activity</strong><span>Try a different search or filter.</span></div>}</div>
+      <div className="table-wrap"><table className="data-table activity-table simplified"><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Where</th><th>When</th></tr></thead><tbody>{filteredEvents.map((event) => <tr key={event.id}><td><strong className="military-time">{formatTime(event.occurredAt)}</strong></td><td><strong>{event.operatorName || event.personName || "Unknown credential"}</strong>{event.affectedPersonName && <small>Affected: {event.affectedPersonName}</small>}</td><td>{event.eventKind === "CONTROL" ? <span className="decision-pill control">⇄ {event.actionLabel}</span> : <span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span>}<small>{label(event.reasonCode)}</small></td><td><strong>{event.zoneName || event.zoneId}</strong><small>{event.sourceLabel || "Entry reader"}</small></td><td><strong>{formatDate(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td></tr>)}</tbody></table>{filteredEvents.length === 0 && <div className="activity-empty"><strong>No matching activity</strong><span>Try a different search or filter.</span></div>}</div>
     </section>
   );
 }

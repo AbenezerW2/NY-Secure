@@ -76,7 +76,7 @@ Expired tickets disappear immediately when the visitor is not signed in. If the 
 
 ## Alarms and activity
 
-Command center controls take priority over ordinary access profiles. A locked-down door rejects every badge; a remotely unlocked door remains open and bypasses badge scanning; normal mode restores scheduled profile checks. Security can also grant one active person access to one door for 15 minutes, 1 hour, or 8 hours without altering their permanent profile. Every command records the door, action, operator, affected person when applicable, and time.
+Command center controls take priority over ordinary access profiles. A locked-down door rejects every badge; a remotely unlocked door remains open and bypasses badge scanning; normal mode restores scheduled profile checks. Security can also grant one active person access to one door for 15 minutes, 1 hour, or 8 hours without altering their permanent profile. Every command records the door, action, operator, affected person when applicable, and time in both the Command center audit trail and the main Activity log. Locator remains scan-only so a remote command never replaces a person’s last-known physical location.
 
 Alarms are separated from customer-directory data and use the report columns:
 
