@@ -1376,7 +1376,25 @@ function PeopleView({
   const activePeopleTab = globalQuery.trim() ? "global" : storedPeopleTab;
   const [checkInAction, setCheckInAction] = useState<string | null>(null);
   const [checkInError, setCheckInError] = useState("");
+  const [onSiteQuery, setOnSiteQuery] = useState("");
+  const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const onSite = checkIns.filter((checkIn) => checkIn.status === "ON_SITE");
+  const filteredOnSite = useMemo(() => checkIns
+    .filter((checkIn) => checkIn.status === "ON_SITE")
+    .filter((checkIn) => {
+      const person = peopleById.get(checkIn.personId);
+      return wildcardMatchAny([
+        checkIn.personName,
+        checkIn.organizationName,
+        checkIn.badgeNumber,
+        checkIn.relationshipType,
+        checkIn.lastScanZone,
+        person?.firstName,
+        person?.lastName,
+        person?.email,
+      ], onSiteQuery);
+    })
+    .sort((a, b) => a.personName.localeCompare(b.personName)), [checkIns, onSiteQuery, peopleById]);
   const pending = checkIns.filter((checkIn) => checkIn.status === "PENDING");
   const history = checkIns
     .filter((checkIn) => checkIn.status === "SIGNED_OUT" && checkIn.verifiedAt && checkIn.signedOutAt)
@@ -1460,12 +1478,17 @@ function PeopleView({
       </nav>
     {checkInError && <div className="people-checkin-error" role="alert">{checkInError}</div>}
     {activePeopleTab === "onsite" && <section className="panel people-presence-panel">
-      <header className="presence-header"><div><p className="eyebrow">Security-verified arrivals</p><h2>People currently on-site</h2><p>Only people verified by security appear in this active roster.</p></div><span className="presence-total"><strong>{onSite.length}</strong><small>On-site now</small></span></header>
-      {onSite.length > 0 ? <div className="presence-card-grid">{onSite.map((checkIn) => <article className="presence-card" key={checkIn.id}>
-        <div className="presence-card-person"><span className="avatar hue-2">{checkIn.personName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div><strong>{checkIn.personName}</strong><small>{checkIn.organizationName}</small></div><span className="presence-status onsite"><i />On-site</span></div>
-        <dl><div><dt>Record type</dt><dd>{label(checkIn.relationshipType)}</dd></div><div><dt>Badge</dt><dd><code>{checkIn.badgeNumber}</code></dd></div><div><dt>Verified</dt><dd>{checkIn.verifiedAt ? `${formatTime(checkIn.verifiedAt)} · ${checkIn.verifiedBy || "Security"}` : "Security verified"}</dd></div><div><dt>Last scan</dt><dd>{checkIn.lastScanZone || "No scan recorded"}{checkIn.lastScanAt && <small>{relativeEventTime(checkIn.lastScanAt)}</small>}</dd></div></dl>
-        <footer><span>Signed in via {label(checkIn.source)} · {relativeEventTime(checkIn.requestedAt)}</span><button className="secondary-button" disabled={checkInAction === `${checkIn.id}-SIGN_OUT`} onClick={() => updateCheckIn(checkIn.id, "SIGN_OUT")} type="button">{checkInAction === `${checkIn.id}-SIGN_OUT` ? "Signing out…" : "Sign out"}</button></footer>
-      </article>)}</div> : <div className="presence-empty"><span>◎</span><h3>No verified visitors are on-site</h3><p>People appear here after security approves their portal or kiosk sign-in.</p></div>}
+      <header className="presence-header"><div><p className="eyebrow">Security-verified arrivals</p><h2>People currently on-site</h2><p>A searchable contact-card roster for everyone security has verified on site.</p></div><span className="presence-total"><strong>{onSite.length}</strong><small>On-site now</small></span></header>
+      {onSite.length > 0 && <div className="onsite-directory-toolbar"><label className="table-search"><span aria-hidden="true">⌕</span><input aria-label="Search people currently on-site" onChange={(event) => setOnSiteQuery(event.target.value)} placeholder="Search name, company, card, or last scan… Try *Patel*" title="Use * to match any characters" value={onSiteQuery} /></label><span className="result-count">Showing {filteredOnSite.length} of {onSite.length}</span></div>}
+      {filteredOnSite.length > 0 ? <div className="contact-card-grid onsite-contact-grid">{filteredOnSite.map((checkIn) => {
+        const person = peopleById.get(checkIn.personId);
+        return <article className="person-contact-card onsite-contact-card" key={checkIn.id}>
+          <span className="contact-card-type onsite"><i />On-site · {label(checkIn.relationshipType)}</span>
+          <button aria-label={`Open profile for ${checkIn.personName}`} className="contact-card-body onsite-contact-main" disabled={!person} onClick={() => person && openProfile(person)} type="button"><span className="contact-card-photo" aria-label="No profile photo"><i /><b /></span><span className="contact-card-name"><strong>{checkIn.personName}</strong><small>{checkIn.organizationName}</small></span><span className="contact-card-menu" aria-hidden="true">⠿</span></button>
+          <dl className="onsite-card-meta"><div><dt>Card</dt><dd><code>{checkIn.badgeNumber}</code></dd></div><div><dt>Last scan</dt><dd>{checkIn.lastScanZone || "No scan recorded"}{checkIn.lastScanAt && <small>{relativeEventTime(checkIn.lastScanAt)}</small>}</dd></div><div><dt>Verified</dt><dd>{checkIn.verifiedAt ? formatTime(checkIn.verifiedAt) : "Verified"}<small>{checkIn.verifiedBy || "Security"}</small></dd></div><div><dt>Arrival</dt><dd>{formatTime(checkIn.requestedAt)}<small>{label(checkIn.source)} · {relativeEventTime(checkIn.requestedAt)}</small></dd></div></dl>
+          <footer className="onsite-contact-footer"><span>Select the contact to open their profile.</span><button className="secondary-button" disabled={checkInAction === `${checkIn.id}-SIGN_OUT`} onClick={() => updateCheckIn(checkIn.id, "SIGN_OUT")} type="button">{checkInAction === `${checkIn.id}-SIGN_OUT` ? "Signing out…" : "Sign out"}</button></footer>
+        </article>;
+      })}</div> : onSite.length > 0 ? <div className="presence-empty onsite-search-empty"><span>⌕</span><h3>No matching people on site</h3><p>Try another name, company, card number, or wildcard pattern.</p></div> : <div className="presence-empty"><span>◎</span><h3>No verified visitors are on-site</h3><p>People appear here after security approves their portal or kiosk sign-in.</p></div>}
     </section>}
     {activePeopleTab === "pending" && <section className="panel people-presence-panel pending-presence-panel">
       <header className="presence-header"><div><p className="eyebrow">Awaiting identity check</p><h2>Pending security verification</h2><p>Review portal and kiosk arrivals before allowing them onto the active on-site roster.</p></div><span className="presence-total pending"><strong>{pending.length}</strong><small>Waiting</small></span></header>
