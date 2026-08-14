@@ -239,8 +239,8 @@ export async function PATCH(request: Request) {
     const signedInAt = now.toISOString();
     const result = await db
       .prepare(
-        `UPDATE scheduled_visits
-         SET signed_in_at = ?, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+      `UPDATE scheduled_visits
+         SET signed_in_at = ?, updated_at = CURRENT_TIMESTAMP
          WHERE ticket_number = ? AND signed_in_at IS NULL AND signed_out_at IS NULL`,
       )
       .bind(signedInAt, ticketNumber)
