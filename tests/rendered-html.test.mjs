@@ -51,6 +51,8 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(consoleSource, /activeNavGroup/);
   assert.match(consoleSource, /sidebar-navigation/);
   assert.match(styles, /\.section-taskbar/);
+  assert.match(styles, /\.taskbar-sections > button \{ flex: 1 1 0; \}/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 1fr\) minmax\(210px, 250px\)/);
   assert.match(styles, /\.sidebar-navigation[\s\S]*overflow-y:\s*auto/);
   assert.match(consoleSource, /Last-known access point/);
   assert.match(consoleSource, /Find a last-known scan/);
