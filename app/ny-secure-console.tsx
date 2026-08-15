@@ -1030,7 +1030,7 @@ export default function NySecureConsole() {
         <button
           aria-controls="operator-profile-menu"
           aria-expanded={showOperatorMenu}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           className={showOperatorMenu ? "taskbar-profile menu-open" : "taskbar-profile"}
           onClick={() => setShowOperatorMenu((current) => !current)}
           type="button"
@@ -1047,19 +1047,39 @@ export default function NySecureConsole() {
 
       {showOperatorMenu && (
         <div className="operator-menu-layer" onMouseDown={() => setShowOperatorMenu(false)}>
-          <section aria-label="Maya Brooks operator options" className="operator-menu" id="operator-profile-menu" onMouseDown={(event) => event.stopPropagation()} role="menu">
+          <section aria-label="Maya Brooks operator options" className="operator-menu" id="operator-profile-menu" onMouseDown={(event) => event.stopPropagation()} role="dialog">
             <header>
               <span className="avatar avatar-maya">MB</span>
               <span><strong>Maya Brooks</strong><small>Security administrator</small></span>
               <i><b /> Active</i>
             </header>
-            <div className="operator-menu-options">
-              <button onClick={() => { setShowOperatorMenu(false); setShowOperatorProfile(true); }} role="menuitem" type="button"><span aria-hidden="true">MB</span><span><strong>Operator profile</strong><small>Identity, role, and permissions</small></span><b aria-hidden="true">›</b></button>
-              <button onClick={() => { setShowOperatorMenu(false); setShowSettings(true); }} role="menuitem" type="button"><span aria-hidden="true">Aa</span><span><strong>Display settings</strong><small>Theme, text size, and dashboard</small></span><b aria-hidden="true">›</b></button>
-              <button onClick={() => { setShowOperatorMenu(false); setActiveView("activity"); }} role="menuitem" type="button"><span aria-hidden="true">LG</span><span><strong>Activity log</strong><small>Review every recorded action</small></span><b aria-hidden="true">›</b></button>
-              <button onClick={() => { setShowOperatorMenu(false); setActiveView("command"); }} role="menuitem" type="button"><span aria-hidden="true">CC</span><span><strong>Command center</strong><small>Door modes and person grants</small></span><b aria-hidden="true">›</b></button>
+            <div className="operator-menu-content">
+              <button className="operator-profile-option" onClick={() => { setShowOperatorMenu(false); setShowOperatorProfile(true); }} type="button"><span aria-hidden="true">MB</span><span><strong>Profile & permissions</strong><small>View operator identity and access</small></span><b aria-hidden="true">›</b></button>
+              <section className="operator-preference-group" aria-label="Color mode">
+                <label>Color mode</label>
+                <div className="operator-segmented-control">
+                  <button aria-pressed={theme === "light"} className={theme === "light" ? "active" : ""} onClick={() => { setTheme("light"); window.localStorage.setItem("ny-secure-theme", "light"); }} type="button"><span aria-hidden="true">☀</span> Light</button>
+                  <button aria-pressed={theme === "dark"} className={theme === "dark" ? "active" : ""} onClick={() => { setTheme("dark"); window.localStorage.setItem("ny-secure-theme", "dark"); }} type="button"><span aria-hidden="true">☾</span> Dark</button>
+                </div>
+              </section>
+              <section className="operator-preference-group" aria-label="Font size">
+                <label>Font size</label>
+                <div className="operator-segmented-control three-options">
+                  <button aria-pressed={fontSize === "small"} className={fontSize === "small" ? "active" : ""} onClick={() => updateFontSize("small")} type="button">Small</button>
+                  <button aria-pressed={fontSize === "comfortable"} className={fontSize === "comfortable" ? "active" : ""} onClick={() => updateFontSize("comfortable")} type="button">Default</button>
+                  <button aria-pressed={fontSize === "large"} className={fontSize === "large" ? "active" : ""} onClick={() => updateFontSize("large")} type="button">Large</button>
+                </div>
+              </section>
+              <section className="operator-preference-group" aria-label="Layout density">
+                <label>Layout density</label>
+                <div className="operator-segmented-control">
+                  <button aria-pressed={density === "compact"} className={density === "compact" ? "active" : ""} onClick={() => updateDensity("compact")} type="button">Compact</button>
+                  <button aria-pressed={density === "comfortable"} className={density === "comfortable" ? "active" : ""} onClick={() => updateDensity("comfortable")} type="button">Comfortable</button>
+                </div>
+              </section>
+              <button className="operator-settings-link" onClick={() => { setShowOperatorMenu(false); setShowSettings(true); }} type="button"><span aria-hidden="true">⚙</span><span><strong>All display settings</strong><small>Dashboard widgets and more</small></span><b aria-hidden="true">›</b></button>
             </div>
-            <footer><span>DC-01</span><small>Simulation environment</small></footer>
+            <footer><span>DC-01 · Simulation</span><a href="/signout-with-chatgpt?return_to=%2F">Log out</a></footer>
           </section>
         </div>
       )}
