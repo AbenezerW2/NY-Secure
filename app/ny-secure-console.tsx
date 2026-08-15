@@ -632,6 +632,8 @@ export default function NySecureConsole() {
   const [density, setDensity] = useState<DensityPreference>("comfortable");
   const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOperatorMenu, setShowOperatorMenu] = useState(false);
+  const [showOperatorProfile, setShowOperatorProfile] = useState(false);
   const [activeStatTab, setActiveStatTab] = useState<StatTab | null>(null);
   const [simulationResult, setSimulationResult] = useState<{
     decision: "GRANTED" | "DENIED";
@@ -720,6 +722,17 @@ export default function NySecureConsole() {
     const timer = window.setTimeout(() => setFlash(null), 3600);
     return () => window.clearTimeout(timer);
   }, [flash]);
+
+  useEffect(() => {
+    if (!showOperatorMenu && !showOperatorProfile) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setShowOperatorMenu(false);
+      setShowOperatorProfile(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showOperatorMenu, showOperatorProfile]);
 
   const orgMap = useMemo(
     () => new Map(data?.organizations.map((org) => [org.id, org]) ?? []),
@@ -1014,7 +1027,15 @@ export default function NySecureConsole() {
             </button>;
           })}
         </div>
-        <button className="taskbar-profile" type="button" aria-label="Open Maya Brooks operator profile">
+        <button
+          aria-controls="operator-profile-menu"
+          aria-expanded={showOperatorMenu}
+          aria-haspopup="menu"
+          className={showOperatorMenu ? "taskbar-profile menu-open" : "taskbar-profile"}
+          onClick={() => setShowOperatorMenu((current) => !current)}
+          type="button"
+          aria-label="Open Maya Brooks operator menu"
+        >
           <span className="avatar avatar-maya">MB</span>
           <span>
             <strong>Maya Brooks</strong>
@@ -1023,6 +1044,25 @@ export default function NySecureConsole() {
           <b aria-hidden="true">•••</b>
         </button>
       </nav>
+
+      {showOperatorMenu && (
+        <div className="operator-menu-layer" onMouseDown={() => setShowOperatorMenu(false)}>
+          <section aria-label="Maya Brooks operator options" className="operator-menu" id="operator-profile-menu" onMouseDown={(event) => event.stopPropagation()} role="menu">
+            <header>
+              <span className="avatar avatar-maya">MB</span>
+              <span><strong>Maya Brooks</strong><small>Security administrator</small></span>
+              <i><b /> Active</i>
+            </header>
+            <div className="operator-menu-options">
+              <button onClick={() => { setShowOperatorMenu(false); setShowOperatorProfile(true); }} role="menuitem" type="button"><span aria-hidden="true">MB</span><span><strong>Operator profile</strong><small>Identity, role, and permissions</small></span><b aria-hidden="true">›</b></button>
+              <button onClick={() => { setShowOperatorMenu(false); setShowSettings(true); }} role="menuitem" type="button"><span aria-hidden="true">Aa</span><span><strong>Display settings</strong><small>Theme, text size, and dashboard</small></span><b aria-hidden="true">›</b></button>
+              <button onClick={() => { setShowOperatorMenu(false); setActiveView("activity"); }} role="menuitem" type="button"><span aria-hidden="true">LG</span><span><strong>Activity log</strong><small>Review every recorded action</small></span><b aria-hidden="true">›</b></button>
+              <button onClick={() => { setShowOperatorMenu(false); setActiveView("command"); }} role="menuitem" type="button"><span aria-hidden="true">CC</span><span><strong>Command center</strong><small>Door modes and person grants</small></span><b aria-hidden="true">›</b></button>
+            </div>
+            <footer><span>DC-01</span><small>Simulation environment</small></footer>
+          </section>
+        </div>
+      )}
 
       {showAddPerson && data && (
         <AddPersonDialog
@@ -1065,6 +1105,7 @@ export default function NySecureConsole() {
           onClose={() => setShowSettings(false)}
         />
       )}
+      {showOperatorProfile && <OperatorProfileDrawer onClose={() => setShowOperatorProfile(false)} />}
     </main>
   );
 }
@@ -2354,6 +2395,39 @@ function SettingsDrawer({
         <section className="settings-section"><div className="settings-section-title"><h3>Layout density</h3><p>Controls spacing in lists and tables.</p></div><div className="segmented-setting" role="group" aria-label="Layout density"><button className={density === "compact" ? "active" : ""} onClick={() => onDensityChange("compact")} type="button">Compact</button><button className={density === "comfortable" ? "active" : ""} onClick={() => onDensityChange("comfortable")} type="button">Comfortable</button></div></section>
         <section className="settings-section dashboard-settings"><div className="settings-section-title"><h3>Overview widgets</h3><p>Leave every option off for a blank home page.</p></div><div className="widget-options">{DASHBOARD_WIDGETS.map((widget) => <label key={widget.id}><span><strong>{widget.label}</strong><small>{widget.description}</small></span><input type="checkbox" checked={widgets.includes(widget.id)} onChange={() => toggleWidget(widget.id)} /><i aria-hidden="true" /></label>)}</div><div className="settings-actions"><button onClick={() => onWidgetsChange(DASHBOARD_WIDGETS.map((widget) => widget.id))} type="button">Show all</button><button onClick={() => onWidgetsChange([])} type="button">Clear overview</button></div></section>
         <footer className="settings-footer"><span>{widgets.length} of {DASHBOARD_WIDGETS.length} widgets selected</span><button className="primary-button" onClick={onClose} type="button">Done</button></footer>
+      </aside>
+    </div>
+  );
+}
+
+function OperatorProfileDrawer({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="drawer-backdrop operator-profile-backdrop" onMouseDown={onClose}>
+      <aside aria-label="Maya Brooks operator profile" className="operator-profile-drawer" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="operator-profile-header">
+          <div><p className="eyebrow">Signed-in operator</p><h2>Operator profile</h2><p>Identity and permissions for the current NY-Secure session.</p></div>
+          <button aria-label="Close operator profile" className="close-button" onClick={onClose} type="button">×</button>
+        </header>
+        <section className="operator-profile-identity">
+          <span className="avatar avatar-maya">MB</span>
+          <div><h3>Maya Brooks</h3><p>Security administrator</p><span><i /> Active session</span></div>
+        </section>
+        <dl className="operator-profile-facts">
+          <div><dt>Operator ID</dt><dd>NYS-MB-001</dd></div>
+          <div><dt>Assigned site</dt><dd>NY-Secure · DC-01</dd></div>
+          <div><dt>Local time zone</dt><dd>America / New York</dd></div>
+          <div><dt>Environment</dt><dd>Simulation</dd></div>
+        </dl>
+        <section className="operator-permissions">
+          <div><p className="eyebrow">Authorized capabilities</p><h3>Security administrator permissions</h3></div>
+          <ul>
+            <li><span>CC</span><div><strong>Command Center controls</strong><small>Unlock, lock, normalize, and grant person access.</small></div><b>Allowed</b></li>
+            <li><span>VS</span><div><strong>Visitor verification</strong><small>Verify photos, start visits, and manage on-site status.</small></div><b>Allowed</b></li>
+            <li><span>AR</span><div><strong>Alarm response</strong><small>Review alarms and linked customer records.</small></div><b>Allowed</b></li>
+            <li><span>LG</span><div><strong>Audit review</strong><small>Read the unified access and command activity log.</small></div><b>Allowed</b></li>
+          </ul>
+        </section>
+        <footer><span>All operator actions are recorded in Activity.</span><button className="primary-button" onClick={onClose} type="button">Done</button></footer>
       </aside>
     </div>
   );

@@ -51,7 +51,15 @@ test("defines the NY-Secure access-control product experience", async () => {
   assert.match(simulateRoute, /COMMAND_PERSON_GRANT/);
   assert.match(consoleSource, /aria-label="Main sections"/);
   assert.match(consoleSource, /taskbar-profile/);
-  assert.match(consoleSource, /Open Maya Brooks operator profile/);
+  assert.match(consoleSource, /Open Maya Brooks operator menu/);
+  assert.match(consoleSource, /Maya Brooks operator options/);
+  assert.match(consoleSource, /Operator profile/);
+  assert.match(consoleSource, /Display settings/);
+  assert.match(consoleSource, /Activity log/);
+  assert.match(consoleSource, /Command center/);
+  assert.match(consoleSource, /Security administrator permissions/);
+  assert.match(styles, /\.operator-menu/);
+  assert.match(styles, /\.operator-profile-drawer/);
   assert.doesNotMatch(consoleSource, /operator-card/);
   assert.match(consoleSource, /activeNavGroup/);
   assert.match(consoleSource, /sidebar-navigation/);
