@@ -2106,6 +2106,7 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
   const [modeFilter, setModeFilter] = useState("ALL");
   const [selectedPeople, setSelectedPeople] = useState<Record<string, string>>({});
   const [durations, setDurations] = useState<Record<string, string>>({});
+  const [expandedDoorIds, setExpandedDoorIds] = useState<string[]>([]);
   const [runningAction, setRunningAction] = useState("");
   const activePeople = people.filter((person) => person.status === "ACTIVE").sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
 
@@ -2155,36 +2156,56 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
     }
   }
 
-  const filteredDoors = doors.filter((door) =>
+  const cageDoors = doors.filter((door) => door.category === "CUSTOMER_CAGE");
+  const filteredDoors = cageDoors.filter((door) =>
     (modeFilter === "ALL" || door.mode === modeFilter) &&
     wildcardMatchAny([door.zoneName, door.zoneCode, door.category, door.location, door.grantedPersonName], query),
   );
-  const unlockedCount = doors.filter((door) => door.mode === "UNLOCKED").length;
-  const lockedCount = doors.filter((door) => door.mode === "LOCKED").length;
-  const grantCount = doors.filter((door) => Boolean(door.grantedPersonId)).length;
+  const unlockedCount = cageDoors.filter((door) => door.mode === "UNLOCKED").length;
+  const lockedCount = cageDoors.filter((door) => door.mode === "LOCKED").length;
+  const grantCount = cageDoors.filter((door) => Boolean(door.grantedPersonId)).length;
+
+  function toggleDoorFolder(zoneId: string) {
+    setExpandedDoorIds((current) => current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]);
+  }
 
   return <div className="command-center-layout">
     <section className="command-summary-grid">
-      <article className="panel"><span>Available doors</span><strong>{zones.filter((zone) => zone.status === "ONLINE").length}</strong><small>DC-01 readers under control</small></article>
+      <article className="panel"><span>Available cages</span><strong>{cageDoors.length || zones.filter((zone) => zone.type === "CAGE" && zone.status === "ONLINE").length}</strong><small>DC-01 cage doors under control</small></article>
       <article className="panel unlocked"><span>Remotely unlocked</span><strong>{unlockedCount}</strong><small>Badge scanning bypassed</small></article>
       <article className="panel locked"><span>Locked down</span><strong>{lockedCount}</strong><small>All credential access denied</small></article>
       <article className="panel granted"><span>Person grants</span><strong>{grantCount}</strong><small>Active door-specific overrides</small></article>
     </section>
 
     <section className="panel command-door-panel">
-      <header className="command-panel-header"><div><p className="eyebrow">All controlled entrances</p><h2>Door controls</h2><p>Remote commands override normal credential policy until badge control is restored.</p></div><span><i />Live controls</span></header>
-      <div className="directory-toolbar command-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search command center doors" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search door, code, or location…" title="Use * to match any characters" /></label><select aria-label="Filter doors by control mode" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option value="ALL">All control modes</option><option value="NORMAL">Badge control</option><option value="UNLOCKED">Remotely unlocked</option><option value="LOCKED">Locked down</option></select><span className="result-count">{filteredDoors.length} doors</span></div>
+      <header className="command-panel-header"><div><p className="eyebrow">DC-01 cage directory</p><h2>Cage command explorer</h2><p>Open a cage folder to view and run its available door commands.</p></div><span><i />Live controls</span></header>
+      <div className="directory-toolbar command-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search command center cages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cage, code, or hall…" title="Use * to match any characters" /></label><select aria-label="Filter cages by control mode" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option value="ALL">All control modes</option><option value="NORMAL">Badge control</option><option value="UNLOCKED">Remotely unlocked</option><option value="LOCKED">Locked down</option></select><span className="result-count">{filteredDoors.length} cages</span></div>
       {error && <div className="command-error" role="alert">{error}</div>}
-      {loading ? <div className="command-loading">Loading door controls…</div> : <div className="command-door-grid">{filteredDoors.map((door) => {
+      {loading ? <div className="command-loading">Loading cage controls…</div> : <div className="cage-explorer" role="tree" aria-label="Cage command folders">
+        <div className="cage-explorer-path"><span className="explorer-root-icon" aria-hidden="true">▦</span><strong>DC-01</strong><span aria-hidden="true">›</span><strong>Customer cages</strong></div>
+        <div className="cage-explorer-columns" aria-hidden="true"><span>Name</span><span>Control mode</span><span>Location</span><span>Last changed</span></div>
+        <div className="cage-folder-list">{filteredDoors.map((door) => {
         const selectedPersonId = selectedPeople[door.zoneId] || activePeople[0]?.id || "";
-        return <article className={`command-door-card ${door.mode.toLowerCase()}`} key={door.zoneId}>
-          <header><div className="door-control-icon" aria-hidden="true"><span /><i /></div><div><strong>{door.zoneName}</strong><small>{door.zoneCode} · {label(door.category)} · Level {door.securityTier}</small></div><span className={`door-mode ${door.mode.toLowerCase()}`}>{door.mode === "NORMAL" ? "Badge control" : door.mode === "UNLOCKED" ? "Remotely unlocked" : "Locked down"}</span></header>
-          <div className="door-control-state"><span>Current behavior</span><p>{door.mode === "UNLOCKED" ? "Door is open and badge scans are bypassed." : door.mode === "LOCKED" ? "Door rejects every badge, including otherwise-valid credentials." : "Normal profile, schedule, and credential checks apply."}</p>{door.grantedPersonName && <div className="door-person-grant"><b>Person grant</b><strong>{door.grantedPersonName}</strong><small>Until {formatDate(door.grantExpiresAt)} · {formatTime(door.grantExpiresAt!)}</small></div>}</div>
-          <div className="door-command-actions"><button className="unlock-command" disabled={door.mode === "UNLOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "UNLOCK")} type="button">{runningAction === `${door.zoneId}-UNLOCK` ? "Unlocking…" : "Remote unlock"}</button><button className="lock-command" disabled={door.mode === "LOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "LOCK")} type="button">{runningAction === `${door.zoneId}-LOCK` ? "Locking…" : "Lock door"}</button><button className="normal-command" disabled={door.mode === "NORMAL" && !door.grantedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "NORMAL")} type="button">Badge control</button></div>
-          <div className="door-person-access"><p><strong>Grant person access</strong><small>Door-specific access without changing their profile.</small></p><select aria-label={`Person for ${door.zoneName}`} value={selectedPersonId} onChange={(event) => setSelectedPeople((current) => ({ ...current, [door.zoneId]: event.target.value }))}>{activePeople.map((person) => <option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.badgeId}</option>)}</select><select aria-label={`Grant duration for ${door.zoneName}`} value={durations[door.zoneId] || "60"} onChange={(event) => setDurations((current) => ({ ...current, [door.zoneId]: event.target.value }))}><option value="15">15 minutes</option><option value="60">1 hour</option><option value="480">8 hours</option></select><button disabled={door.mode === "LOCKED" || !selectedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "GRANT_PERSON")} type="button">{runningAction === `${door.zoneId}-GRANT_PERSON` ? "Granting…" : "Grant access"}</button></div>
-          <footer><span>Last changed by {door.updatedBy}</span><time>{relativeEventTime(door.updatedAt)}</time></footer>
+        const isExpanded = expandedDoorIds.includes(door.zoneId);
+        const modeLabel = door.mode === "NORMAL" ? "Badge control" : door.mode === "UNLOCKED" ? "Unlocked" : "Locked down";
+        return <article className={`cage-folder ${door.mode.toLowerCase()} ${isExpanded ? "expanded" : ""}`} key={door.zoneId} role="treeitem" aria-expanded={isExpanded} aria-selected={isExpanded}>
+          <div className="cage-folder-row">
+            <button className="folder-toggle" aria-label={`${isExpanded ? "Close" : "Open"} ${door.zoneName} command folder`} aria-expanded={isExpanded} onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span aria-hidden="true">›</span></button>
+            <button className="folder-name" onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span className="folder-icon" aria-hidden="true" /><span><strong>{door.zoneName}</strong><small>{door.zoneCode} · Security level {door.securityTier}{door.grantedPersonName ? ` · Access granted to ${door.grantedPersonName}` : ""}</small></span></button>
+            <span className={`door-mode ${door.mode.toLowerCase()}`}>{modeLabel}</span>
+            <span className="folder-location">{door.location}</span>
+            <span className="folder-updated">{relativeEventTime(door.updatedAt)}</span>
+          </div>
+          {isExpanded && <div className="cage-command-list" role="group">
+            <div className="command-file-row"><span className="command-file-icon unlock" aria-hidden="true">↗</span><p><strong>Unlock door</strong><small>Open the cage and bypass badge scanning.</small></p><button className="unlock-command" disabled={door.mode === "UNLOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "UNLOCK")} type="button">{runningAction === `${door.zoneId}-UNLOCK` ? "Unlocking…" : "Run command"}</button></div>
+            <div className="command-file-row"><span className="command-file-icon lock" aria-hidden="true">×</span><p><strong>Lock door</strong><small>Deny all credentials until badge control is restored.</small></p><button className="lock-command" disabled={door.mode === "LOCKED" || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "LOCK")} type="button">{runningAction === `${door.zoneId}-LOCK` ? "Locking…" : "Run command"}</button></div>
+            <div className="command-file-row"><span className="command-file-icon normal" aria-hidden="true">✓</span><p><strong>Restore badge control</strong><small>Use normal profiles, schedules, and credential checks.</small></p><button className="normal-command" disabled={door.mode === "NORMAL" && !door.grantedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "NORMAL")} type="button">Run command</button></div>
+            <div className="command-file-row grant"><span className="command-file-icon grant" aria-hidden="true">+</span><p><strong>Grant person access</strong><small>Temporary cage access without changing their profile.</small></p><div className="grant-command-fields"><select aria-label={`Person for ${door.zoneName}`} value={selectedPersonId} onChange={(event) => setSelectedPeople((current) => ({ ...current, [door.zoneId]: event.target.value }))}>{activePeople.map((person) => <option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.badgeId}</option>)}</select><select aria-label={`Grant duration for ${door.zoneName}`} value={durations[door.zoneId] || "60"} onChange={(event) => setDurations((current) => ({ ...current, [door.zoneId]: event.target.value }))}><option value="15">15 minutes</option><option value="60">1 hour</option><option value="480">8 hours</option></select><button disabled={door.mode === "LOCKED" || !selectedPersonId || Boolean(runningAction)} onClick={() => runDoorAction(door.zoneId, "GRANT_PERSON")} type="button">{runningAction === `${door.zoneId}-GRANT_PERSON` ? "Granting…" : "Grant access"}</button></div></div>
+            <div className="cage-folder-note"><span>{door.mode === "UNLOCKED" ? "Door is open and badge scans are bypassed." : door.mode === "LOCKED" ? "Door rejects every badge, including valid credentials." : "Normal credential policy is active."}</span><span>Last changed by {door.updatedBy}</span>{door.grantedPersonName && <span>Grant expires {formatDate(door.grantExpiresAt)} at {formatTime(door.grantExpiresAt!)}</span>}</div>
+          </div>}
         </article>;
-      })}{filteredDoors.length === 0 && <div className="command-empty"><span>⌕</span><strong>No matching doors</strong><p>Try another door name, code, location, or control mode.</p></div>}</div>}
+      })}{filteredDoors.length === 0 && <div className="command-empty"><span>⌕</span><strong>No matching cages</strong><p>Try another cage number, code, hall, or control mode.</p></div>}</div>
+      </div>}
     </section>
 
     <section className="panel command-log-panel"><header className="command-panel-header"><div><p className="eyebrow">Operator audit trail</p><h2>Recent control commands</h2><p>Remote unlocks, lockdowns, badge-control resets, and person grants.</p></div><span>{events.length} events</span></header><div className="command-event-list">{events.map((event) => <article key={event.id}><span className={`command-event-mark ${event.action.toLowerCase()}`}>{event.action === "UNLOCK" ? "↗" : event.action === "LOCK" ? "×" : event.action === "NORMAL" ? "✓" : "+"}</span><div><strong>{event.zoneName}</strong><p>{event.detail}</p><small>{event.operatorName}{event.personName ? ` · ${event.personName}` : ""}</small></div><time><strong>{formatTime(event.createdAt)}</strong><small>{relativeEventTime(event.createdAt)}</small></time></article>)}{events.length === 0 && <div className="command-empty compact"><span>✓</span><strong>No control commands yet</strong><p>Door actions will appear here.</p></div>}</div></section>
