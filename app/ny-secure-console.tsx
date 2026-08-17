@@ -2156,14 +2156,13 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
     }
   }
 
-  const cageDoors = doors.filter((door) => door.category === "CUSTOMER_CAGE");
-  const filteredDoors = cageDoors.filter((door) =>
+  const filteredDoors = doors.filter((door) =>
     (modeFilter === "ALL" || door.mode === modeFilter) &&
     wildcardMatchAny([door.zoneName, door.zoneCode, door.category, door.location, door.grantedPersonName], query),
   );
-  const unlockedCount = cageDoors.filter((door) => door.mode === "UNLOCKED").length;
-  const lockedCount = cageDoors.filter((door) => door.mode === "LOCKED").length;
-  const grantCount = cageDoors.filter((door) => Boolean(door.grantedPersonId)).length;
+  const unlockedCount = doors.filter((door) => door.mode === "UNLOCKED").length;
+  const lockedCount = doors.filter((door) => door.mode === "LOCKED").length;
+  const grantCount = doors.filter((door) => Boolean(door.grantedPersonId)).length;
 
   function toggleDoorFolder(zoneId: string) {
     setExpandedDoorIds((current) => current.includes(zoneId) ? current.filter((id) => id !== zoneId) : [...current, zoneId]);
@@ -2171,18 +2170,18 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
 
   return <div className="command-center-layout">
     <section className="command-summary-grid">
-      <article className="panel"><span>Available cages</span><strong>{cageDoors.length || zones.filter((zone) => zone.type === "CAGE" && zone.status === "ONLINE").length}</strong><small>DC-01 cage doors under control</small></article>
+      <article className="panel"><span>Available doors</span><strong>{doors.length || zones.filter((zone) => zone.status === "ONLINE").length}</strong><small>Every DC-01 entrance under control</small></article>
       <article className="panel unlocked"><span>Remotely unlocked</span><strong>{unlockedCount}</strong><small>Badge scanning bypassed</small></article>
       <article className="panel locked"><span>Locked down</span><strong>{lockedCount}</strong><small>All credential access denied</small></article>
       <article className="panel granted"><span>Person grants</span><strong>{grantCount}</strong><small>Active door-specific overrides</small></article>
     </section>
 
     <section className="panel command-door-panel">
-      <header className="command-panel-header"><div><p className="eyebrow">DC-01 cage directory</p><h2>Cage command explorer</h2><p>Open a cage folder to view and run its available door commands.</p></div><span><i />Live controls</span></header>
-      <div className="directory-toolbar command-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search command center cages" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cage, code, or hall…" title="Use * to match any characters" /></label><select aria-label="Filter cages by control mode" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option value="ALL">All control modes</option><option value="NORMAL">Badge control</option><option value="UNLOCKED">Remotely unlocked</option><option value="LOCKED">Locked down</option></select><span className="result-count">{filteredDoors.length} cages</span></div>
+      <header className="command-panel-header"><div><p className="eyebrow">DC-01 controlled entrances</p><h2>Door control matrix</h2><p>Expand any entrance to view and run its available commands.</p></div><span><i />Live controls</span></header>
+      <div className="directory-toolbar command-toolbar"><label className="table-search"><span>⌕</span><input aria-label="Search command center doors" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search door, code, type, or location…" title="Use * to match any characters" /></label><select aria-label="Filter doors by control mode" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option value="ALL">All control modes</option><option value="NORMAL">Badge control</option><option value="UNLOCKED">Remotely unlocked</option><option value="LOCKED">Locked down</option></select><span className="result-count">{filteredDoors.length} doors</span></div>
       {error && <div className="command-error" role="alert">{error}</div>}
-      {loading ? <div className="command-loading">Loading cage controls…</div> : <div className="cage-explorer" role="tree" aria-label="Cage command folders">
-        <div className="cage-explorer-path"><span className="explorer-root-icon" aria-hidden="true">▦</span><strong>DC-01</strong><span aria-hidden="true">›</span><strong>Customer cages</strong></div>
+      {loading ? <div className="command-loading">Loading door controls…</div> : <div className="cage-explorer" role="tree" aria-label="Door command controls">
+        <div className="cage-explorer-path"><span className="rack-icon compact" aria-hidden="true" /><strong>DC-01</strong><span aria-hidden="true">›</span><strong>All controlled entrances</strong></div>
         <div className="cage-explorer-columns" aria-hidden="true"><span>Name</span><span>Control mode</span><span>Location</span><span>Last changed</span></div>
         <div className="cage-folder-list">{filteredDoors.map((door) => {
         const selectedPersonId = selectedPeople[door.zoneId] || activePeople[0]?.id || "";
@@ -2190,8 +2189,8 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
         const modeLabel = door.mode === "NORMAL" ? "Badge control" : door.mode === "UNLOCKED" ? "Unlocked" : "Locked down";
         return <article className={`cage-folder ${door.mode.toLowerCase()} ${isExpanded ? "expanded" : ""}`} key={door.zoneId} role="treeitem" aria-expanded={isExpanded} aria-selected={isExpanded}>
           <div className="cage-folder-row">
-            <button className="folder-toggle" aria-label={`${isExpanded ? "Close" : "Open"} ${door.zoneName} command folder`} aria-expanded={isExpanded} onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span aria-hidden="true">›</span></button>
-            <button className="folder-name" onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span className="folder-icon" aria-hidden="true" /><span><strong>{door.zoneName}</strong><small>{door.zoneCode} · Security level {door.securityTier}{door.grantedPersonName ? ` · Access granted to ${door.grantedPersonName}` : ""}</small></span></button>
+            <button className="folder-toggle" aria-label={`${isExpanded ? "Collapse" : "Expand"} ${door.zoneName} controls`} aria-expanded={isExpanded} onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span aria-hidden="true">›</span></button>
+            <button className="folder-name" onClick={() => toggleDoorFolder(door.zoneId)} type="button"><span className="rack-icon" aria-hidden="true" /><span><strong>{door.zoneName}</strong><small>{door.zoneCode} · {label(door.category)} · Security level {door.securityTier}{door.grantedPersonName ? ` · Access granted to ${door.grantedPersonName}` : ""}</small></span></button>
             <span className={`door-mode ${door.mode.toLowerCase()}`}>{modeLabel}</span>
             <span className="folder-location">{door.location}</span>
             <span className="folder-updated">{relativeEventTime(door.updatedAt)}</span>
@@ -2204,7 +2203,7 @@ function CommandCenterView({ zones, people, onCommandsChanged }: { zones: Zone[]
             <div className="cage-folder-note"><span>{door.mode === "UNLOCKED" ? "Door is open and badge scans are bypassed." : door.mode === "LOCKED" ? "Door rejects every badge, including valid credentials." : "Normal credential policy is active."}</span><span>Last changed by {door.updatedBy}</span>{door.grantedPersonName && <span>Grant expires {formatDate(door.grantExpiresAt)} at {formatTime(door.grantExpiresAt!)}</span>}</div>
           </div>}
         </article>;
-      })}{filteredDoors.length === 0 && <div className="command-empty"><span>⌕</span><strong>No matching cages</strong><p>Try another cage number, code, hall, or control mode.</p></div>}</div>
+      })}{filteredDoors.length === 0 && <div className="command-empty"><span>⌕</span><strong>No matching doors</strong><p>Try another entrance name, code, type, location, or control mode.</p></div>}</div>
       </div>}
     </section>
 
