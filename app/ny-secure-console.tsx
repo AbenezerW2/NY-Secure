@@ -2301,6 +2301,8 @@ function AlarmsView({
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savingAlarmId, setSavingAlarmId] = useState("");
   const [alarmActionError, setAlarmActionError] = useState("");
+  const [clearConfirmation, setClearConfirmation] = useState<Alarm | null>(null);
+  const [readConfirmed, setReadConfirmed] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ personId: string; x: number; y: number } | null>(null);
   const [profileRequest, setProfileRequest] = useState<{ personId: string; tab: ProfileTab } | null>(null);
   const alarmTypes = Array.from(new Set(alarms.map((alarm) => alarm.alarmType))).sort();
@@ -2323,6 +2325,24 @@ function AlarmsView({
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [contextMenu, profileRequest]);
+
+  useEffect(() => {
+    if (!clearConfirmation) return;
+    function closeConfirmationOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setClearConfirmation(null);
+      setReadConfirmed(false);
+    }
+    window.addEventListener("keydown", closeConfirmationOnEscape);
+    return () => window.removeEventListener("keydown", closeConfirmationOnEscape);
+  }, [clearConfirmation]);
+
+  function requestClearAttempt(alarm: Alarm) {
+    if (alarm.status !== "ACTIVE" || savingAlarmId) return;
+    setAlarmActionError("");
+    setReadConfirmed(false);
+    setClearConfirmation(alarm);
+  }
 
   function openAlarmMenu(personId: string, x: number, y: number) {
     setContextMenu({
@@ -2349,6 +2369,10 @@ function AlarmsView({
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || "The alarm update could not be completed.");
       if (action === "ADD_COMMENT") setCommentDrafts((current) => ({ ...current, [alarmId]: "" }));
+      if (action === "ATTEMPT_CLEAR") {
+        setClearConfirmation(null);
+        setReadConfirmed(false);
+      }
       await onAlarmsChanged();
     } catch (actionError) {
       setAlarmActionError(actionError instanceof Error ? actionError.message : "The alarm update could not be completed.");
@@ -2387,16 +2411,23 @@ function AlarmsView({
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
       <div className="alarm-stage-guide" aria-label="Alarm response stages"><div className="active"><i /><span><strong>Needs response</strong><small>No clear attempt yet</small></span></div><div className="acknowledged"><i /><span><strong>Clear attempted</strong><small>Condition is still active</small></span></div><div className="cleared"><i /><span><strong>Resolved</strong><small>Door or condition confirmed normal</small></span></div></div>
-      <div className="alarm-guidance"><span aria-hidden="true">↗</span><p><strong>Profile tools</strong> Right-click an alarm to open the customer contact card or review scan locations from the last 24 hours.</p></div>
+      <div className="alarm-guidance"><span aria-hidden="true">↗</span><p><strong>Responding to alarms</strong> Double-click a red alarm to review and acknowledge it before attempting to clear. Right-click an alarm to open customer profile tools.</p></div>
       {alarmActionError && <div className="command-error" role="alert">{alarmActionError}</div>}
       <div className="table-wrap">
         <table className="data-table activity-table alarm-table simplified">
           <thead><tr><th>Time</th><th>When</th><th>Who</th><th>What</th><th>Where</th><th>Response</th></tr></thead>
-          <tbody>{filteredAlarms.map((alarm) => <Fragment key={alarm.id}><tr className={`${alarm.personId ? "alarm-row person-linked" : "alarm-row"} stage-${alarm.status.toLowerCase()}`} onContextMenu={(event) => {
+          <tbody>{filteredAlarms.map((alarm) => <Fragment key={alarm.id}><tr className={`${alarm.personId ? "alarm-row person-linked" : "alarm-row"} stage-${alarm.status.toLowerCase()}`} onDoubleClick={(event) => {
+              if ((event.target as HTMLElement).closest("button, input, textarea, select")) return;
+              requestClearAttempt(alarm);
+            }} onKeyDown={(event) => {
+              if (event.key !== "Enter" || alarm.status !== "ACTIVE") return;
+              event.preventDefault();
+              requestClearAttempt(alarm);
+            }} tabIndex={alarm.status === "ACTIVE" ? 0 : -1} onContextMenu={(event) => {
               if (!alarm.personId) return;
               event.preventDefault();
               openAlarmMenu(alarm.personId, event.clientX, event.clientY);
-            }} title={alarm.personId ? "Right-click for contact and scan history" : undefined}>
+            }} title={alarm.status === "ACTIVE" ? "Double-click to acknowledge and attempt clear" : alarm.personId ? "Right-click for contact and scan history" : undefined}>
               <td><strong className="military-time">{formatTime(alarm.occurredAt)}</strong></td>
               <td><strong>{formatDate(alarm.occurredAt)}</strong><small>{relativeEventTime(alarm.occurredAt)}</small></td>
               <td><div className="alarm-person-heading"><strong>{alarm.personName}</strong>{alarm.personId && <button aria-label={`Open profile actions for ${alarm.personName}`} onClick={(event) => {
@@ -2406,13 +2437,25 @@ function AlarmsView({
               }} type="button">•••</button>}</div><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
               <td><span className={`alarm-pill ${alarm.severity.toLowerCase()}`}><i />{label(alarm.alarmType)}</span><small>{alarm.detail}</small></td>
               <td><strong>{alarm.zoneName}</strong><small>{alarm.source}</small></td>
-              <td><div className="alarm-response-cell"><span className={`alarm-stage-pill ${alarm.status.toLowerCase()}`}><i />{alarm.status === "ACTIVE" ? "Needs response" : alarm.status === "ACKNOWLEDGED" ? "Clear attempted" : "Resolved"}</span>{alarm.status === "ACTIVE" ? <button disabled={savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "ATTEMPT_CLEAR")} type="button">{savingAlarmId === alarm.id ? "Recording…" : "Attempt clear"}</button> : alarm.status === "ACKNOWLEDGED" ? <button className="resolve-alarm-button" disabled={savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "RESOLVE")} type="button">{savingAlarmId === alarm.id ? "Saving…" : "Mark resolved"}</button> : null}<button className="alarm-comments-button" onClick={() => setExpandedAlarmId((current) => current === alarm.id ? "" : alarm.id)} type="button">{alarm.comments.length} {alarm.comments.length === 1 ? "comment" : "comments"} <span aria-hidden="true">{expandedAlarmId === alarm.id ? "▴" : "▾"}</span></button></div></td>
+              <td><div className="alarm-response-cell"><span className={`alarm-stage-pill ${alarm.status.toLowerCase()}`}><i />{alarm.status === "ACTIVE" ? "Needs response" : alarm.status === "ACKNOWLEDGED" ? "Clear attempted" : "Resolved"}</span>{alarm.status === "ACTIVE" ? <span className="alarm-double-click-hint">Double-click row to clear</span> : alarm.status === "ACKNOWLEDGED" ? <button className="resolve-alarm-button" disabled={savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "RESOLVE")} type="button">{savingAlarmId === alarm.id ? "Saving…" : "Mark resolved"}</button> : null}<button className="alarm-comments-button" onClick={() => setExpandedAlarmId((current) => current === alarm.id ? "" : alarm.id)} type="button">{alarm.comments.length} {alarm.comments.length === 1 ? "comment" : "comments"} <span aria-hidden="true">{expandedAlarmId === alarm.id ? "▴" : "▾"}</span></button></div></td>
             </tr>
             {expandedAlarmId === alarm.id && <tr className="alarm-detail-row"><td colSpan={6}><div className="alarm-comment-panel"><header><div><strong>Guard notes and response log</strong><small>Add context about technicians, approved project work, or what was found on site.</small></div><span>{alarm.zoneName}</span></header><div className="alarm-comment-list">{alarm.comments.map((comment) => <article className={comment.kind.toLowerCase()} key={comment.id}><span aria-hidden="true">{comment.kind === "ACTION" ? "✓" : "“"}</span><div><p>{comment.body}</p><small>{comment.authorName} · {formatDate(comment.createdAt)} at {formatTime(comment.createdAt)}</small></div></article>)}{alarm.comments.length === 0 && <p className="alarm-no-comments">No comments yet. Add the first guard note below.</p>}</div><div className="alarm-comment-form"><textarea aria-label={`Comment for ${alarm.zoneName} alarm`} maxLength={1000} onChange={(event) => setCommentDrafts((current) => ({ ...current, [alarm.id]: event.target.value }))} placeholder="Example: Technician inside Cage 11010 for approved cooling project…" value={commentDrafts[alarm.id] || ""} /><button disabled={!commentDrafts[alarm.id]?.trim() || savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "ADD_COMMENT")} type="button">{savingAlarmId === alarm.id ? "Adding…" : "Add comment"}</button></div></div></td></tr>}
           </Fragment>)}</tbody>
         </table>
         {filteredAlarms.length === 0 && <div className="activity-empty"><strong>No matching alarms</strong><span>Try a different search or filter.</span></div>}
       </div>
+      {clearConfirmation && <div className="drawer-backdrop alarm-clear-backdrop" onMouseDown={() => {
+        if (savingAlarmId) return;
+        setClearConfirmation(null);
+        setReadConfirmed(false);
+      }}>
+        <section aria-labelledby="alarm-clear-title" aria-modal="true" className="alarm-clear-dialog" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+          <header><span aria-hidden="true">!</span><div><p className="eyebrow">Clear-attempt confirmation</p><h2 id="alarm-clear-title">Acknowledge this alarm</h2><p>Confirm that you reviewed the alarm before recording a clear attempt.</p></div><button aria-label="Cancel clear attempt" className="close-button" disabled={Boolean(savingAlarmId)} onClick={() => { setClearConfirmation(null); setReadConfirmed(false); }} type="button">×</button></header>
+          <div className="alarm-clear-summary"><div><span>Alarm</span><strong>{label(clearConfirmation.alarmType)}</strong></div><div><span>Location</span><strong>{clearConfirmation.zoneName}</strong></div><div><span>Source</span><strong>{clearConfirmation.source}</strong></div><p>{clearConfirmation.detail}</p></div>
+          <label className="alarm-read-confirmation"><input checked={readConfirmed} onChange={(event) => setReadConfirmed(event.target.checked)} type="checkbox" /><span><strong>I saw and read this alarm</strong><small>I understand that confirming records a clear attempt and moves the alarm to the blue, unresolved stage.</small></span></label>
+          <footer><button className="secondary-button" disabled={Boolean(savingAlarmId)} onClick={() => { setClearConfirmation(null); setReadConfirmed(false); }} type="button">Cancel</button><button className="alarm-confirm-clear-button" disabled={!readConfirmed || Boolean(savingAlarmId)} onClick={() => runAlarmAction(clearConfirmation.id, "ATTEMPT_CLEAR")} type="button">{savingAlarmId ? "Recording attempt…" : "Confirm clear attempt"}</button></footer>
+        </section>
+      </div>}
       {contextMenu && <div className="alarm-context-layer" onMouseDown={() => setContextMenu(null)}>
         <div aria-label="Alarm profile actions" className="alarm-context-menu" onMouseDown={(event) => event.stopPropagation()} role="menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
           <p>Customer record</p>
