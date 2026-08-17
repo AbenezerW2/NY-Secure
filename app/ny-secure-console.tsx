@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 
 type View =
@@ -104,6 +104,15 @@ type Alarm = {
   source: string;
   detail: string;
   status: "ACTIVE" | "ACKNOWLEDGED" | "CLEARED";
+  comments: AlarmComment[];
+};
+
+type AlarmComment = {
+  id: string;
+  authorName: string;
+  body: string;
+  kind: "NOTE" | "ACTION";
+  createdAt: string;
 };
 
 type ScheduledVisit = {
@@ -552,6 +561,16 @@ function normalizeState(source: {
     source: String(item.source ?? "Access control"),
     detail: String(item.detail ?? "Alarm condition detected."),
     status: (["ACTIVE", "ACKNOWLEDGED", "CLEARED"].includes(String(item.status)) ? String(item.status) : "ACTIVE") as Alarm["status"],
+    comments: Array.isArray(item.comments) ? item.comments.map((comment) => {
+      const record = comment as Record<string, unknown>;
+      return {
+        id: String(record.id),
+        authorName: String(record.authorName ?? "Security operator"),
+        body: String(record.body ?? ""),
+        kind: (String(record.kind) === "ACTION" ? "ACTION" : "NOTE") as AlarmComment["kind"],
+        createdAt: String(record.createdAt),
+      };
+    }) : [],
   }));
   const scheduledVisits: ScheduledVisit[] = (source.scheduledVisits ?? []).map((item) => ({
     ticketNumber: String(item.ticketNumber),
@@ -645,8 +664,8 @@ export default function NySecureConsole() {
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [showCreateVisit, setShowCreateVisit] = useState(false);
 
-  const loadState = useCallback(async () => {
-    setLoading(true);
+  const loadState = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setLoadError("");
     try {
       const response = await fetch("/api/state", { cache: "no-store" });
@@ -658,7 +677,7 @@ export default function NySecureConsole() {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "The simulator database could not be loaded.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -1008,6 +1027,7 @@ export default function NySecureConsole() {
                   profiles={profileMap}
                   events={data.events}
                   zones={zoneMap}
+                  onAlarmsChanged={() => loadState(false)}
                 />
               )}
               {activeView === "activity" && <ActivityView events={[...data.events, ...data.commandEvents].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))} />}
@@ -2219,6 +2239,7 @@ function AlarmsView({
   profiles,
   events,
   zones,
+  onAlarmsChanged,
 }: {
   alarms: Alarm[];
   people: Person[];
@@ -2227,18 +2248,25 @@ function AlarmsView({
   profiles: Map<string, Profile>;
   events: AccessEvent[];
   zones: Map<string, Zone>;
+  onAlarmsChanged: () => void | Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [alarmType, setAlarmType] = useState("ALL");
   const [severity, setSeverity] = useState("ALL");
+  const [stage, setStage] = useState("ALL");
+  const [expandedAlarmId, setExpandedAlarmId] = useState("");
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [savingAlarmId, setSavingAlarmId] = useState("");
+  const [alarmActionError, setAlarmActionError] = useState("");
   const [contextMenu, setContextMenu] = useState<{ personId: string; x: number; y: number } | null>(null);
   const [profileRequest, setProfileRequest] = useState<{ personId: string; tab: ProfileTab } | null>(null);
   const alarmTypes = Array.from(new Set(alarms.map((alarm) => alarm.alarmType))).sort();
   const filteredAlarms = alarms.filter((alarm) => {
-    const matchesSearch = wildcardMatchAny([alarm.personName, alarm.alarmType, label(alarm.alarmType), alarm.zoneName, alarm.source, alarm.detail], search);
+    const matchesSearch = wildcardMatchAny([alarm.personName, alarm.alarmType, label(alarm.alarmType), alarm.zoneName, alarm.source, alarm.detail, ...alarm.comments.map((comment) => comment.body)], search);
     const matchesType = alarmType === "ALL" || alarm.alarmType === alarmType;
     const matchesSeverity = severity === "ALL" || alarm.severity === severity;
-    return matchesSearch && matchesType && matchesSeverity;
+    const matchesStage = stage === "ALL" || alarm.status === stage;
+    return matchesSearch && matchesType && matchesSeverity && matchesStage;
   });
   const profilePerson = profileRequest ? people.find((person) => person.id === profileRequest.personId) : undefined;
 
@@ -2266,6 +2294,26 @@ function AlarmsView({
     setProfileRequest({ personId, tab });
   }
 
+  async function runAlarmAction(alarmId: string, action: "ATTEMPT_CLEAR" | "RESOLVE" | "ADD_COMMENT") {
+    setSavingAlarmId(alarmId);
+    setAlarmActionError("");
+    try {
+      const response = await fetch("/api/alarms", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ alarmId, action, comment: commentDrafts[alarmId] }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "The alarm update could not be completed.");
+      if (action === "ADD_COMMENT") setCommentDrafts((current) => ({ ...current, [alarmId]: "" }));
+      await onAlarmsChanged();
+    } catch (actionError) {
+      setAlarmActionError(actionError instanceof Error ? actionError.message : "The alarm update could not be completed.");
+    } finally {
+      setSavingAlarmId("");
+    }
+  }
+
   function exportCsv() {
     const header = ["Time", "When", "Who", "What", "Where"];
     const rows = filteredAlarms.map((alarm) => [
@@ -2290,29 +2338,35 @@ function AlarmsView({
         <div className="toolbar-filters">
           <select aria-label="Filter by alarm type" value={alarmType} onChange={(event) => setAlarmType(event.target.value)}><option value="ALL">All alarm types</option>{alarmTypes.map((item) => <option value={item} key={item}>{label(item)}</option>)}</select>
           <select aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
+          <select aria-label="Filter by response stage" value={stage} onChange={(event) => setStage(event.target.value)}><option value="ALL">All response stages</option><option value="ACTIVE">Needs response</option><option value="ACKNOWLEDGED">Clear attempted</option><option value="CLEARED">Resolved</option></select>
         </div>
         <span className="result-count">{filteredAlarms.length} alarms</span>
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
-      <div className="alarm-guidance"><span aria-hidden="true">↗</span><p><strong>Person-linked alarm actions</strong> Right-click an alarm to open the customer contact card or review scan locations from the last 24 hours.</p></div>
+      <div className="alarm-stage-guide" aria-label="Alarm response stages"><div className="active"><i /><span><strong>Needs response</strong><small>No clear attempt yet</small></span></div><div className="acknowledged"><i /><span><strong>Clear attempted</strong><small>Condition is still active</small></span></div><div className="cleared"><i /><span><strong>Resolved</strong><small>Door or condition confirmed normal</small></span></div></div>
+      <div className="alarm-guidance"><span aria-hidden="true">↗</span><p><strong>Profile tools</strong> Right-click an alarm to open the customer contact card or review scan locations from the last 24 hours.</p></div>
+      {alarmActionError && <div className="command-error" role="alert">{alarmActionError}</div>}
       <div className="table-wrap">
         <table className="data-table activity-table alarm-table simplified">
-          <thead><tr><th>Time</th><th>When</th><th>Who</th><th>What</th><th>Where</th></tr></thead>
-          <tbody>{filteredAlarms.map((alarm) => <tr className={alarm.personId ? "alarm-row person-linked" : "alarm-row"} key={alarm.id} onContextMenu={(event) => {
-            if (!alarm.personId) return;
-            event.preventDefault();
-            openAlarmMenu(alarm.personId, event.clientX, event.clientY);
-          }} title={alarm.personId ? "Right-click for contact and scan history" : undefined}>
-            <td><strong className="military-time">{formatTime(alarm.occurredAt)}</strong></td>
-            <td><strong>{formatDate(alarm.occurredAt)}</strong><small>{relativeEventTime(alarm.occurredAt)}</small></td>
-            <td><div className="alarm-person-heading"><strong>{alarm.personName}</strong>{alarm.personId && <button aria-label={`Open profile actions for ${alarm.personName}`} onClick={(event) => {
-              event.stopPropagation();
-              const bounds = event.currentTarget.getBoundingClientRect();
-              openAlarmMenu(alarm.personId!, bounds.right, bounds.bottom + 4);
-            }} type="button">•••</button>}</div><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
-            <td><span className={`alarm-pill ${alarm.severity.toLowerCase()}`}><i />{label(alarm.alarmType)}</span><small>{alarm.detail}</small></td>
-            <td><strong>{alarm.zoneName}</strong><small>{alarm.source} · {label(alarm.status)}</small></td>
-          </tr>)}</tbody>
+          <thead><tr><th>Time</th><th>When</th><th>Who</th><th>What</th><th>Where</th><th>Response</th></tr></thead>
+          <tbody>{filteredAlarms.map((alarm) => <Fragment key={alarm.id}><tr className={`${alarm.personId ? "alarm-row person-linked" : "alarm-row"} stage-${alarm.status.toLowerCase()}`} onContextMenu={(event) => {
+              if (!alarm.personId) return;
+              event.preventDefault();
+              openAlarmMenu(alarm.personId, event.clientX, event.clientY);
+            }} title={alarm.personId ? "Right-click for contact and scan history" : undefined}>
+              <td><strong className="military-time">{formatTime(alarm.occurredAt)}</strong></td>
+              <td><strong>{formatDate(alarm.occurredAt)}</strong><small>{relativeEventTime(alarm.occurredAt)}</small></td>
+              <td><div className="alarm-person-heading"><strong>{alarm.personName}</strong>{alarm.personId && <button aria-label={`Open profile actions for ${alarm.personName}`} onClick={(event) => {
+                event.stopPropagation();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                openAlarmMenu(alarm.personId!, bounds.right, bounds.bottom + 4);
+              }} type="button">•••</button>}</div><small>{alarm.personId ? "Known credential holder" : "System or unknown identity"}</small></td>
+              <td><span className={`alarm-pill ${alarm.severity.toLowerCase()}`}><i />{label(alarm.alarmType)}</span><small>{alarm.detail}</small></td>
+              <td><strong>{alarm.zoneName}</strong><small>{alarm.source}</small></td>
+              <td><div className="alarm-response-cell"><span className={`alarm-stage-pill ${alarm.status.toLowerCase()}`}><i />{alarm.status === "ACTIVE" ? "Needs response" : alarm.status === "ACKNOWLEDGED" ? "Clear attempted" : "Resolved"}</span>{alarm.status === "ACTIVE" ? <button disabled={savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "ATTEMPT_CLEAR")} type="button">{savingAlarmId === alarm.id ? "Recording…" : "Attempt clear"}</button> : alarm.status === "ACKNOWLEDGED" ? <button className="resolve-alarm-button" disabled={savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "RESOLVE")} type="button">{savingAlarmId === alarm.id ? "Saving…" : "Mark resolved"}</button> : null}<button className="alarm-comments-button" onClick={() => setExpandedAlarmId((current) => current === alarm.id ? "" : alarm.id)} type="button">{alarm.comments.length} {alarm.comments.length === 1 ? "comment" : "comments"} <span aria-hidden="true">{expandedAlarmId === alarm.id ? "▴" : "▾"}</span></button></div></td>
+            </tr>
+            {expandedAlarmId === alarm.id && <tr className="alarm-detail-row"><td colSpan={6}><div className="alarm-comment-panel"><header><div><strong>Guard notes and response log</strong><small>Add context about technicians, approved project work, or what was found on site.</small></div><span>{alarm.zoneName}</span></header><div className="alarm-comment-list">{alarm.comments.map((comment) => <article className={comment.kind.toLowerCase()} key={comment.id}><span aria-hidden="true">{comment.kind === "ACTION" ? "✓" : "“"}</span><div><p>{comment.body}</p><small>{comment.authorName} · {formatDate(comment.createdAt)} at {formatTime(comment.createdAt)}</small></div></article>)}{alarm.comments.length === 0 && <p className="alarm-no-comments">No comments yet. Add the first guard note below.</p>}</div><div className="alarm-comment-form"><textarea aria-label={`Comment for ${alarm.zoneName} alarm`} maxLength={1000} onChange={(event) => setCommentDrafts((current) => ({ ...current, [alarm.id]: event.target.value }))} placeholder="Example: Technician inside Cage 11010 for approved cooling project…" value={commentDrafts[alarm.id] || ""} /><button disabled={!commentDrafts[alarm.id]?.trim() || savingAlarmId === alarm.id} onClick={() => runAlarmAction(alarm.id, "ADD_COMMENT")} type="button">{savingAlarmId === alarm.id ? "Adding…" : "Add comment"}</button></div></div></td></tr>}
+          </Fragment>)}</tbody>
         </table>
         {filteredAlarms.length === 0 && <div className="activity-empty"><strong>No matching alarms</strong><span>Try a different search or filter.</span></div>}
       </div>

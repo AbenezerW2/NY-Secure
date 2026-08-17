@@ -71,6 +71,13 @@
       "when": 1786729440490,
       "tag": "0009_special_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786984579179,
+      "tag": "0010_watery_firestar",
+      "breakpoints": true
     }
   ]
 }

@@ -593,6 +593,14 @@ const schemaStatements = [
     occurred_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS alarm_comments (
+    id TEXT PRIMARY KEY NOT NULL,
+    alarm_id TEXT NOT NULL REFERENCES alarms(id),
+    author_name TEXT NOT NULL DEFAULT 'Maya Brooks',
+    body TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'NOTE' CHECK (kind IN ('NOTE', 'ACTION')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS door_controls (
     zone_id TEXT PRIMARY KEY NOT NULL REFERENCES zones(id),
     mode TEXT NOT NULL DEFAULT 'NORMAL' CHECK (mode IN ('NORMAL', 'UNLOCKED', 'LOCKED')),
@@ -661,6 +669,7 @@ const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS idx_alarms_occurred_at ON alarms(occurred_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_type_status ON alarms(alarm_type, status)",
   "CREATE INDEX IF NOT EXISTS idx_alarms_zone_occurred_at ON alarms(zone_id, occurred_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_alarm_comments_alarm_created_at ON alarm_comments(alarm_id, created_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_door_controls_mode ON door_controls(mode)",
   "CREATE INDEX IF NOT EXISTS idx_door_control_events_created_at ON door_control_events(created_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_door_control_events_zone_created_at ON door_control_events(zone_id, created_at DESC)",
@@ -999,7 +1008,7 @@ async function seedDatabase(db: D1Database) {
              alarm_type = excluded.alarm_type, severity = excluded.severity,
              person_id = excluded.person_id, actor_label = excluded.actor_label,
              zone_id = excluded.zone_id, source = excluded.source,
-             detail = excluded.detail, status = excluded.status`,
+             detail = excluded.detail`,
         )
         .bind(
           alarm.id,
@@ -1015,6 +1024,23 @@ async function seedDatabase(db: D1Database) {
         ),
     ),
   );
+
+  await db.batch([
+    db.prepare(
+      `INSERT OR IGNORE INTO alarm_comments
+        (id, alarm_id, author_name, body, kind, created_at)
+       VALUES ('alarm-comment-seed-003-action', 'alarm-seed-003', 'Maya Brooks',
+         'Clear attempt recorded. The condition remained active and requires another check.',
+         'ACTION', ?)`,
+    ).bind(new Date(now.getTime() - 24 * 60 * 1000).toISOString()),
+    db.prepare(
+      `INSERT OR IGNORE INTO alarm_comments
+        (id, alarm_id, author_name, body, kind, created_at)
+       VALUES ('alarm-comment-seed-005-note', 'alarm-seed-005', 'Maya Brooks',
+         'Technician was completing approved maintenance in the area. Door confirmed closed after the initial response.',
+         'NOTE', ?)`,
+    ).bind(new Date(now.getTime() - 61 * 60 * 1000).toISOString()),
+  ]);
 
   const seededVisits = [
     {

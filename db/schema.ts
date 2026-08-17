@@ -211,6 +211,23 @@ export const alarms = sqliteTable(
   ],
 );
 
+export const alarmComments = sqliteTable(
+  "alarm_comments",
+  {
+    id: text("id").primaryKey(),
+    alarmId: text("alarm_id")
+      .notNull()
+      .references(() => alarms.id),
+    authorName: text("author_name").notNull().default("Maya Brooks"),
+    body: text("body").notNull(),
+    kind: text("kind").notNull().default("NOTE"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_alarm_comments_alarm_created_at").on(table.alarmId, table.createdAt),
+  ],
+);
+
 export const doorControls = sqliteTable(
   "door_controls",
   {

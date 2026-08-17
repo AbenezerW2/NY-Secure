@@ -94,6 +94,15 @@ type AlarmRow = {
   occurredAt: string;
 };
 
+type AlarmCommentRow = {
+  id: string;
+  alarmId: string;
+  authorName: string;
+  body: string;
+  kind: "NOTE" | "ACTION";
+  createdAt: string;
+};
+
 type ScheduledVisitRow = {
   ticketNumber: string;
   siteCode: string;
@@ -158,6 +167,7 @@ export async function getState(db: D1Database) {
     eventResult,
     commandEventResult,
     alarmResult,
+    alarmCommentResult,
     visitResult,
     checkInResult,
     countResult,
@@ -283,6 +293,15 @@ export async function getState(db: D1Database) {
          LIMIT 100`,
       )
       .all<AlarmRow>(),
+    db
+      .prepare(
+        `SELECT
+          id, alarm_id AS alarmId, author_name AS authorName,
+          body, kind, created_at AS createdAt
+         FROM alarm_comments
+         ORDER BY created_at DESC`,
+      )
+      .all<AlarmCommentRow>(),
     db
       .prepare(
         `SELECT
@@ -449,7 +468,10 @@ export async function getState(db: D1Database) {
     assignments,
     events: eventResult.results,
     commandEvents: commandEventResult.results,
-    alarms: alarmResult.results,
+    alarms: alarmResult.results.map((alarm) => ({
+      ...alarm,
+      comments: alarmCommentResult.results.filter((comment) => comment.alarmId === alarm.id),
+    })),
     scheduledVisits,
     checkIns: checkInResult.results,
     stats: {
