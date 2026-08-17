@@ -2096,6 +2096,9 @@ select:focus-visible {
 .alarm-table.simplified th:nth-child(6) { width: 19%; }
 .military-time { font-family: var(--font-geist-mono), monospace; letter-spacing: .04em; }
 .decision-pill.control { color: #5842a7; background: #ece7ff; }
+.decision-pill.alarm { color: #a32834; background: #ffe7e9; }
+.decision-pill.alarm.attempted { color: #235aa9; background: #e4efff; }
+.decision-pill.alarm.resolved { color: #0b7852; background: #ddf6eb; }
 .activity-empty { display: grid; min-height: 190px; place-items: center; align-content: center; gap: 6px; color: var(--muted); font-size: calc(9px * var(--font-scale)); }
 .event-item { display: grid; grid-template-columns: auto minmax(100px, .8fr) minmax(135px, 1fr) minmax(120px, 1fr) auto; }
 .event-copy small { color: var(--soft-muted); font-size: calc(6px * var(--font-scale)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -2178,6 +2181,9 @@ select:focus-visible {
 .app-shell[data-theme="dark"] .alarm-response-cell .alarm-comments-button { color: #bdc9d5; background: #16263d; border-color: var(--line); }
 .app-shell[data-theme="dark"] .alarm-comment-list article > span { color: #bdc9d5; background: #1a2c43; }
 .app-shell[data-theme="dark"] .alarm-comment-list article.action > span { color: #a9c8ff; background: #17345f; }
+.app-shell[data-theme="dark"] .decision-pill.alarm { color: #ff9ba4; background: #421e27; }
+.app-shell[data-theme="dark"] .decision-pill.alarm.attempted { color: #a9c8ff; background: #17345f; }
+.app-shell[data-theme="dark"] .decision-pill.alarm.resolved { color: #70dbb5; background: #12382f; }
 .app-shell[data-theme="dark"] .locator-mode-note { background: #142b48; border-color: var(--line); }
 .app-shell[data-theme="dark"] .locator-mode-note > span { color: #a9c8ff; background: #17345f; }
 .app-shell[data-theme="dark"] .locator-summary-footer { background: #0c1728; }

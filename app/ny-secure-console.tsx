@@ -85,7 +85,7 @@ type AccessEvent = {
   decision: "GRANTED" | "DENIED";
   reasonCode: string;
   explanation?: string;
-  eventKind?: "ACCESS" | "CONTROL";
+  eventKind?: "ACCESS" | "CONTROL" | "ALARM";
   actionLabel?: string;
   operatorName?: string;
   affectedPersonName?: string | null;
@@ -635,6 +635,49 @@ function normalizeState(source: {
   };
 }
 
+function alarmActivityEvents(alarms: Alarm[]): AccessEvent[] {
+  return alarms.flatMap((alarm) => {
+    const opened: AccessEvent = {
+      id: `alarm-opened-${alarm.id}`,
+      occurredAt: alarm.occurredAt,
+      personId: alarm.personId || "",
+      personName: alarm.personName,
+      zoneId: alarm.zoneId,
+      zoneName: alarm.zoneName,
+      decision: "DENIED",
+      reasonCode: alarm.alarmType,
+      explanation: alarm.detail,
+      eventKind: "ALARM",
+      actionLabel: "Alarm triggered",
+      sourceLabel: alarm.source,
+    };
+    const updates = alarm.comments.map<AccessEvent>((comment) => {
+      const actionLabel = comment.kind === "NOTE"
+        ? "Guard comment"
+        : comment.body.startsWith("Alarm confirmed resolved")
+          ? "Alarm resolved"
+          : "Clear attempt";
+      return {
+        id: `alarm-update-${comment.id}`,
+        occurredAt: comment.createdAt,
+        personId: alarm.personId || "",
+        personName: alarm.personName,
+        zoneId: alarm.zoneId,
+        zoneName: alarm.zoneName,
+        decision: actionLabel === "Alarm resolved" ? "GRANTED" : "DENIED",
+        reasonCode: comment.kind === "NOTE" ? "ALARM_NOTE" : "ALARM_RESPONSE",
+        explanation: comment.body,
+        eventKind: "ALARM",
+        actionLabel,
+        operatorName: comment.authorName,
+        affectedPersonName: alarm.personName,
+        sourceLabel: alarm.source,
+      };
+    });
+    return [opened, ...updates];
+  });
+}
+
 export default function NySecureConsole() {
   const [activeView, setActiveView] = useState<View>("overview");
   const [data, setData] = useState<StatePayload | null>(null);
@@ -1030,7 +1073,7 @@ export default function NySecureConsole() {
                   onAlarmsChanged={() => loadState(false)}
                 />
               )}
-              {activeView === "activity" && <ActivityView events={[...data.events, ...data.commandEvents].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))} />}
+              {activeView === "activity" && <ActivityView events={[...data.events, ...data.commandEvents, ...alarmActivityEvents(data.alarms)].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))} />}
             </>
           )}
         </div>
@@ -2253,7 +2296,7 @@ function AlarmsView({
   const [search, setSearch] = useState("");
   const [alarmType, setAlarmType] = useState("ALL");
   const [severity, setSeverity] = useState("ALL");
-  const [stage, setStage] = useState("ALL");
+  const [stage, setStage] = useState("OPEN");
   const [expandedAlarmId, setExpandedAlarmId] = useState("");
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savingAlarmId, setSavingAlarmId] = useState("");
@@ -2265,7 +2308,7 @@ function AlarmsView({
     const matchesSearch = wildcardMatchAny([alarm.personName, alarm.alarmType, label(alarm.alarmType), alarm.zoneName, alarm.source, alarm.detail, ...alarm.comments.map((comment) => comment.body)], search);
     const matchesType = alarmType === "ALL" || alarm.alarmType === alarmType;
     const matchesSeverity = severity === "ALL" || alarm.severity === severity;
-    const matchesStage = stage === "ALL" || alarm.status === stage;
+    const matchesStage = stage === "ALL" || (stage === "OPEN" ? alarm.status !== "CLEARED" : alarm.status === stage);
     return matchesSearch && matchesType && matchesSeverity && matchesStage;
   });
   const profilePerson = profileRequest ? people.find((person) => person.id === profileRequest.personId) : undefined;
@@ -2338,9 +2381,9 @@ function AlarmsView({
         <div className="toolbar-filters">
           <select aria-label="Filter by alarm type" value={alarmType} onChange={(event) => setAlarmType(event.target.value)}><option value="ALL">All alarm types</option>{alarmTypes.map((item) => <option value={item} key={item}>{label(item)}</option>)}</select>
           <select aria-label="Filter by severity" value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="ALL">All severities</option><option value="CRITICAL">Critical</option><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select>
-          <select aria-label="Filter by response stage" value={stage} onChange={(event) => setStage(event.target.value)}><option value="ALL">All response stages</option><option value="ACTIVE">Needs response</option><option value="ACKNOWLEDGED">Clear attempted</option><option value="CLEARED">Resolved</option></select>
+          <select aria-label="Filter by response stage" value={stage} onChange={(event) => setStage(event.target.value)}><option value="OPEN">Open alarm queue</option><option value="ACTIVE">Needs response</option><option value="ACKNOWLEDGED">Clear attempted</option><option value="CLEARED">Resolved history</option><option value="ALL">All response stages</option></select>
         </div>
-        <span className="result-count">{filteredAlarms.length} alarms</span>
+        <span className="result-count">{filteredAlarms.length} {stage === "OPEN" ? "open " : ""}alarms</span>
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
       <div className="alarm-stage-guide" aria-label="Alarm response stages"><div className="active"><i /><span><strong>Needs response</strong><small>No clear attempt yet</small></span></div><div className="acknowledged"><i /><span><strong>Clear attempted</strong><small>Condition is still active</small></span></div><div className="cleared"><i /><span><strong>Resolved</strong><small>Door or condition confirmed normal</small></span></div></div>
@@ -2398,12 +2441,12 @@ function AlarmsView({
 
 function ActivityView({ events }: { events: AccessEvent[] }) {
   const [search, setSearch] = useState("");
-  const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED" | "CONTROL">("ALL");
+  const [decision, setDecision] = useState<"ALL" | "GRANTED" | "DENIED" | "CONTROL" | "ALARM">("ALL");
   const [zone, setZone] = useState("ALL");
   const zones = Array.from(new Set(events.map((event) => event.zoneName || event.zoneId))).sort();
   const filteredEvents = events.filter((event) => {
     const matchesSearch = wildcardMatchAny([event.personName, event.operatorName, event.affectedPersonName, event.zoneName, event.decision, event.actionLabel, event.reasonCode, label(event.reasonCode), event.explanation], search);
-    const matchesDecision = decision === "ALL" || (decision === "CONTROL" ? event.eventKind === "CONTROL" : event.eventKind !== "CONTROL" && event.decision === decision);
+    const matchesDecision = decision === "ALL" || (decision === "CONTROL" ? event.eventKind === "CONTROL" : decision === "ALARM" ? event.eventKind === "ALARM" : event.eventKind !== "CONTROL" && event.eventKind !== "ALARM" && event.decision === decision);
     const matchesZone = zone === "ALL" || (event.zoneName || event.zoneId) === zone;
     return matchesSearch && matchesDecision && matchesZone;
   });
@@ -2413,7 +2456,7 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
     const rows = filteredEvents.map((event) => [
       formatTime(event.occurredAt),
       event.operatorName || event.personName || "Unknown credential",
-      event.eventKind === "CONTROL" ? event.actionLabel || "Door command" : event.decision === "GRANTED" ? "Access granted" : "Access denied",
+      event.eventKind === "CONTROL" ? event.actionLabel || "Door command" : event.eventKind === "ALARM" ? event.actionLabel || "Alarm activity" : event.decision === "GRANTED" ? "Access granted" : "Access denied",
       event.zoneName || event.zoneId,
       formatDate(event.occurredAt),
     ]);
@@ -2430,13 +2473,13 @@ function ActivityView({ events }: { events: AccessEvent[] }) {
       <div className="directory-toolbar activity-toolbar">
         <label className="table-search"><span>⌕</span><input aria-label="Search activity" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search activity… Try *granted*" title="Use * to match any characters" /></label>
         <div className="toolbar-filters">
-          <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="CONTROL">Door commands</option><option value="GRANTED">Access granted</option><option value="DENIED">Access denied</option></select>
+          <select aria-label="Filter by decision" value={decision} onChange={(event) => setDecision(event.target.value as typeof decision)}><option value="ALL">All actions</option><option value="ALARM">Alarm activity</option><option value="CONTROL">Door commands</option><option value="GRANTED">Access granted</option><option value="DENIED">Access denied</option></select>
           <select aria-label="Filter by zone" value={zone} onChange={(event) => setZone(event.target.value)}><option value="ALL">All locations</option>{zones.map((item) => <option key={item}>{item}</option>)}</select>
         </div>
         <span className="result-count">{filteredEvents.length} events</span>
         <button className="export-button" onClick={exportCsv} type="button">Export CSV</button>
       </div>
-      <div className="table-wrap"><table className="data-table activity-table simplified"><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Where</th><th>When</th></tr></thead><tbody>{filteredEvents.map((event) => <tr key={event.id}><td><strong className="military-time">{formatTime(event.occurredAt)}</strong></td><td><strong>{event.operatorName || event.personName || "Unknown credential"}</strong>{event.affectedPersonName && <small>Affected: {event.affectedPersonName}</small>}</td><td>{event.eventKind === "CONTROL" ? <span className="decision-pill control">⇄ {event.actionLabel}</span> : <span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span>}<small>{label(event.reasonCode)}</small></td><td><strong>{event.zoneName || event.zoneId}</strong><small>{event.sourceLabel || "Entry reader"}</small></td><td><strong>{formatDate(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td></tr>)}</tbody></table>{filteredEvents.length === 0 && <div className="activity-empty"><strong>No matching activity</strong><span>Try a different search or filter.</span></div>}</div>
+      <div className="table-wrap"><table className="data-table activity-table simplified"><thead><tr><th>Time</th><th>Who</th><th>What</th><th>Where</th><th>When</th></tr></thead><tbody>{filteredEvents.map((event) => <tr key={event.id}><td><strong className="military-time">{formatTime(event.occurredAt)}</strong></td><td><strong>{event.operatorName || event.personName || "Unknown credential"}</strong>{event.affectedPersonName && <small>Affected: {event.affectedPersonName}</small>}</td><td>{event.eventKind === "CONTROL" ? <span className="decision-pill control">⇄ {event.actionLabel}</span> : event.eventKind === "ALARM" ? <span className={`decision-pill alarm ${event.actionLabel === "Alarm resolved" ? "resolved" : event.actionLabel === "Clear attempt" ? "attempted" : ""}`}>! {event.actionLabel}</span> : <span className={`decision-pill ${event.decision.toLowerCase()}`}>{event.decision === "GRANTED" ? "✓" : "×"} {event.decision === "GRANTED" ? "Access granted" : "Access denied"}</span>}<small>{label(event.reasonCode)}</small></td><td><strong>{event.zoneName || event.zoneId}</strong><small>{event.sourceLabel || "Entry reader"}</small></td><td><strong>{formatDate(event.occurredAt)}</strong><small>{relativeEventTime(event.occurredAt)}</small></td></tr>)}</tbody></table>{filteredEvents.length === 0 && <div className="activity-empty"><strong>No matching activity</strong><span>Try a different search or filter.</span></div>}</div>
     </section>
   );
 }
